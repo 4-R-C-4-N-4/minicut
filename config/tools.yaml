@@ -1,0 +1,64 @@
+# MiniCut v1 — tool registry (8 tools + clarify)
+# This is the source of truth for the grammar, validator, and builder.
+# Keep in sync with minicut/grammar/minicut.gbnf and spec.md §5.
+version: 1
+tools:
+  trim:
+    description: Keep only start..end (seconds).
+    required: [input, start, end]
+    args:
+      start: {type: float, min: 0}
+      end: {type: float, min: 0}
+  cut_out:
+    description: Remove start..end, keep the rest.
+    required: [input, start, end]
+    args:
+      start: {type: float, min: 0}
+      end: {type: float, min: 0}
+  concat:
+    description: Join inputs in order.
+    required: [inputs]
+    args:
+      inputs: {type: list[str], min_items: 2}
+  scale:
+    description: Resize to width x height.
+    required: [input, width, height]
+    args:
+      width: {type: int, min: 2}
+      height: {type: int, min: 2}
+  speed:
+    description: Change playback speed by factor.
+    required: [input, factor]
+    args:
+      factor: {type: float, min: 0.25, max: 4.0}
+  convert:
+    description: Re-encode to codec/container.
+    required: [input, codec, container]
+    args:
+      codec: {type: enum, values: [libx264, libx265, vp9]}
+      container: {type: enum, values: [mp4, mkv, webm]}
+      crf: {type: int, min: 0, max: 51, default: 23}
+  extract_audio:
+    description: Extract audio to a file.
+    required: [input, format]
+    args:
+      format: {type: enum, values: [mp3, wav, aac]}
+  mute:
+    description: Drop the audio stream.
+    required: [input]
+    args: {}
+  clarify:
+    description: Ask the user for missing/ambiguous args. Not an edit.
+    required: [question]
+    args:
+      question: {type: str}
+      missing: {type: list[str], default: []}
+output:
+  default_derivation: "<stem>_<tool>.<ext>"
+  sandbox: outputs only under the workdir; no absolute paths, no ".."
+safety:
+  codecs_allowlist: [libx264, libx265, vp9]
+  containers_allowlist: [mp4, mkv, webm]
+  audio_formats_allowlist: [mp3, wav, aac]
+  timeout_s: 120
+  max_retries: 2

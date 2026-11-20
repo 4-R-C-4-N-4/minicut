@@ -1,0 +1,13 @@
+# MiniCut v1 GBNF grammar — llama.cpp
+# Enforces: exactly one JSON object, tool from the v1 enum (+ clarify),
+# typed values only. Per-tool arg validation lives in minicut/validate.py,
+# which has the ffprobe context the grammar cannot see.
+# Keep the tool enum in sync with config/tools.yaml.
+root ::= "{" ws "\"tool\"" ws ":" ws tool ws ("," ws string ws ":" ws value)* ws "}"
+tool ::= "\"trim\"" | "\"cut_out\"" | "\"concat\"" | "\"scale\"" | "\"speed\"" | "\"convert\"" | "\"extract_audio\"" | "\"mute\"" | "\"clarify\""
+string ::= "\"" ([^"\\] | "\\" .)* "\""
+number ::= "-"? [0-9]+ ("." [0-9]+)?
+value ::= string | number | "true" | "false" | "null" | array | object
+array ::= "[" ws (value (ws "," ws value)*)? ws "]"
+object ::= "{" ws (string ws ":" ws value (ws "," ws value)*)? ws "}"
+ws ::= [ \t\n]*
