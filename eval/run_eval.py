@@ -109,6 +109,11 @@ def _http_predict(prompt: str, base_url: str, use_grammar: bool, timeout_s: int 
         "temperature": 0.0,
         "max_tokens": 256,
         "stream": False,
+        # Thinking OFF (spec v1): MiniCPM5-2B's chat template enables
+        # thinking by default, which puts the tool call in
+        # reasoning_content and leaves content empty. Verified 2026-11-20:
+        # with enable_thinking=false the JSON lands in content.
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     if use_grammar:
         body["grammar"] = GRAMMAR_PATH.read_text()
@@ -126,7 +131,10 @@ def _http_predict(prompt: str, base_url: str, use_grammar: bool, timeout_s: int 
     except urllib.error.URLError as e:
         raise RuntimeError(f"cannot reach llama.cpp server at {base_url}: {e.reason}")
     try:
-        return data["choices"][0]["message"]["content"]
+        msg = data["choices"][0]["message"]
+        # Fallback for servers that return the answer as reasoning
+        # (thinking mode on): prefer content, else reasoning_content.
+        return msg.get("content") or msg.get("reasoning_content") or ""
     except (KeyError, IndexError, TypeError):
         raise RuntimeError(f"unexpected server response: {json.dumps(data)[:300]}")
 

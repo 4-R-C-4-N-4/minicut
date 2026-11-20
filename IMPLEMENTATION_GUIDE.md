@@ -603,6 +603,22 @@ in chat only.
   colour segments, not testsrc2 — centre-pixel colour check is
   unambiguous; testsrc2 timecode is a v2 refinement.
 - 2026-11-19: No git repo yet — remote to be decided after this build.
+- 2026-11-20: Baseline v1 done (F16, llama.cpp commit 5f83714, grammar
+  enforced, thinking off). 200/200 cases: verification 55.0%, tool
+  86.0%, arg 48.0%, mean latency 15.4s. Per split: seen 52%, unseen
+  paraphrase 54%, unseen combo 58%, unseen fixture 56%. The gap is
+  schema, not intent: speed always uses "speed" not "factor" (24/24),
+  concat uses "input" not "inputs", convert nests codec in
+  options/params, extract_audio omits "format". Scale 100%, cut_out
+  96%, trim 94% — the tools with few-shot examples work. Whenever the
+  model produced the exact expected call, the wrapper verified it
+  (0 failures). Harness patched for the run: sends
+  chat_template_kwargs enable_thinking=false (thinking on puts the
+  JSON in reasoning_content and leaves content empty) + falls back
+  to reasoning_content if content is empty. Results in
+  eval/results/baseline_v1_*.md. A runtime restart killed the first
+  run mid-split-3; splits 1–2 were already complete and were not
+  re-run, splits 3–4 were re-run after a server warmup.
 - 2026-11-19: v1 intent list cut to 8 tools — trim, cut_out, concat,
   scale, speed, convert, extract_audio, mute. Crop, rotate, fade_in,
   fade_out move to v2.
