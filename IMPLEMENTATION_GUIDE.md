@@ -658,7 +658,30 @@ in chat only.
   this guide.
 - _Open:_ LoRA rank / LR — from a small sweep in Phase 5, not from
   this guide.
-- _Open:_ output naming + overwrite policy — decide in Phase 2.
+- 2026-11-20: Baseline v2 done — same model/server/grammar, with 4
+  few-shot examples added for concat, speed, convert, extract_audio
+  (exact field names: inputs, factor, codec/container/crf, format).
+  Verification 55.0% -> 94.5% (189/200), tool 86% -> 91%, arg
+  48% -> 80%, mean latency 15.4s -> 21.5s (longer prompts).
+  Per split: seen 52% -> 98%, paraphrase 54% -> 92%, combo
+  58% -> 92%, fixture 56% -> 96%. Targeted tools: speed 0% -> 100%,
+  concat 12% -> 100%, convert 12% -> 96%, extract_audio 0% -> 95%.
+  Remaining 11 failures: clarify's exact `missing` list (4),
+  cut_out start/end inversion on paraphrased prompts (4), one
+  trim/cut_out confusion, and 2 execution failures from model-chosen
+  output filenames bypassing wrapper defaults (.vp9 extension, raw
+  .aac duration). Results in eval/results/baseline_v2_*.md. A runtime
+  restart killed the run mid-split-2; split 1 was already saved and
+  splits 2–4 were resumed after a server restart + warmup.
+- 2026-11-20: Saving methodology decided — edit history lives in file
+  metadata, NOT the filename (filename-as-history rejected) and NO
+  sidecar JSON. Scheme: `minicut_chain` tag via ffmpeg -metadata,
+  compact tokens e.g. `trim:12-45;speed:2.0`; probe reads it, wrapper
+  appends and writes it to the new file; filename stays short (stem +
+  one op, _v2 bump on collision, never overwrite, never modify input
+  in place). Caveats: metadata is invisible without an inspect
+  command and can be stripped by other tools/uploads — then the chain
+  restarts from that op. To build after baseline_v2, then re-baseline.
 
 ## 12. Sources
 
