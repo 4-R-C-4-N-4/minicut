@@ -692,8 +692,19 @@ in chat only.
   Tests in `tests/test_chain.py`: tokens, trim->speed chain
   `trim:0-20;speed:2`, model-chosen `.vp9` output ignored, second
   identical edit bumps to `_v2`. WAV is the one format that drops
-  the tag, so a WAV extract restarts the chain. Baseline_v3 re-run
-  follows, since the wrapper now owns output names.
+  the tag, so a WAV extract restarts the chain.
+- 2026-11-20: Baseline v3 done (same model/prompts as v2, only the
+  wrapper changed: it now derives output names and stamps the chain).
+  No regression — verification 94.5% -> 95.5% (191/200), tool 91%,
+  arg 80%, mean latency 17.2s. Per split: seen 98%, paraphrase 92%,
+  combo 92% -> 96%, fixture 96%. The two v2 model-output-filename
+  failures are gone. Remaining 9 failures: clarify exact missing
+  list (4), cut_out start/end inversion on "remove this range"
+  phrasings (4), one trim/cut_out confusion. Results in
+  eval/results/baseline_v3_*.md. A runtime restart killed the run
+  mid-paraphrase; seen was already saved and the other three splits
+  were resumed after a server restart + warmup. Baseline_v3 is the
+  number Phase 4 (LoRA) has to beat.
 
 ## 12. Sources
 
