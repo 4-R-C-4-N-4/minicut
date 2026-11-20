@@ -681,7 +681,19 @@ in chat only.
   one op, _v2 bump on collision, never overwrite, never modify input
   in place). Caveats: metadata is invisible without an inspect
   command and can be stripped by other tools/uploads — then the chain
-  restarts from that op. To build after baseline_v2, then re-baseline.
+  restarts from that op. Built 2026-11-20: `minicut/chain.py`
+  (tokens + append + read), `Probe.chain` from ffprobe tags
+  (case-insensitive), `build()` stamps `-metadata minicut_chain=...`
+  on every template (+ `-movflags use_metadata_tags` for .mp4/.m4a,
+  without which the mov muxer silently drops custom keys — found by
+  a failing test, not by reading docs), wrapper derives the output
+  name and ignores the model's `output` field entirely, `_v2` bump
+  on collision, never overwrites, never modifies an input in place.
+  Tests in `tests/test_chain.py`: tokens, trim->speed chain
+  `trim:0-20;speed:2`, model-chosen `.vp9` output ignored, second
+  identical edit bumps to `_v2`. WAV is the one format that drops
+  the tag, so a WAV extract restarts the chain. Baseline_v3 re-run
+  follows, since the wrapper now owns output names.
 
 ## 12. Sources
 

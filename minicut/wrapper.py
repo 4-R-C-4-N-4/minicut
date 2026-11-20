@@ -20,9 +20,23 @@ from .verify import verify_output
 MAX_RETRIES = 2
 
 
-def _resolve_output(tool_call: dict, workdir: Path) -> Path:
-    name = tool_call.get("output") or build_mod.default_output(tool_call)
-    return workdir / name
+def _resolve_output(tool_call: dict, workdir: Path, inputs: list[str]) -> Path:
+    """Wrapper-owned output name: the model's `output` field is ignored
+    entirely (it was the source of the baseline_v2 execution failures —
+    a model-chosen `.vp9` extension ffmpeg cannot mux, and a raw `.aac`
+    that under-reports duration). The name is stem + one op token.
+    Never overwrites: if the derived name exists, bump _v2, _v3, ...
+    Never modifies an input in place: the derived name is bumped away
+    from any input path too."""
+    name = build_mod.default_output(tool_call)
+    out = workdir / name
+    stem, suffix = out.stem, out.suffix
+    input_paths = {workdir / f for f in inputs}
+    n = 2
+    while out.exists() or out in input_paths:
+        out = workdir / f"{stem}_v{n}{suffix}"
+        n += 1
+    return out
 
 
 def edit(tool_call: dict, workdir: str | Path,
@@ -53,9 +67,18 @@ def edit(tool_call: dict, workdir: str | Path,
     if errors:
         return {"ok": False, "error": "; ".join(errors)}
 
+    # Resolve the output once, up front: build() writes to it, and
+    # retries reuse the same path (they must not bump it again).
+    inputs = list(tool_call.get("inputs", [])) or [tool_call["input"]]
+    out_path = _resolve_output(tool_call, workdir, inputs)
+
     call = dict(tool_call)
     attempt = 0
     while True:
+        # Force the wrapper-derived name: any model-chosen output is
+        # overwritten here, every attempt, so ffmpeg can never be sent
+        # a bad extension or an in-place path.
+        call = dict(call, output=out_path.name)
         # Concat needs a demuxer list file.
         list_file = None
         if call["tool"] == "concat":
@@ -71,7 +94,6 @@ def edit(tool_call: dict, workdir: str | Path,
         finally:
             if list_file:
                 Path(list_file).unlink(missing_ok=True)
-        out_path = _resolve_output(call, workdir)
         if result.exit_code != 0:
             err = result.stderr.strip()[-800:]
             if llm and attempt < MAX_RETRIES:
@@ -94,5 +116,11 @@ def edit(tool_call: dict, workdir: str | Path,
                 continue
             return {"ok": False, "error": f"verification failed: {reason}",
                     "output": str(out_path)}
+        # Chain as actually written into the output file, read back
+        # from its metadata — ground truth, not what we hoped to write.
+        try:
+            chain = probe_file(out_path).chain
+        except Exception:
+            chain = None
         return {"ok": True, "output": str(out_path), "verification": reason,
-                "retries": attempt}
+                "chain": chain, "retries": attempt}

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .chain import CHAIN_KEY, append_chain, token_for
 from .probe import Probe
 
 
@@ -45,6 +46,25 @@ def default_output(tool_call: dict) -> str:
 
 
 def build(tool_call: dict, probe: Probe, workdir: Path) -> list[str]:
+    """Build argv, then stamp the edit-history chain into the output's
+    metadata. The output path is always the last element, and -metadata
+    is an output option, so it goes just before it. If the input had no
+    chain tag, the chain starts with this op's token."""
+    argv = _build(tool_call, probe, workdir)
+    chain = append_chain(probe.chain if probe is not None else None,
+                         token_for(tool_call))
+    # MP4/M4A's muxer drops arbitrary metadata keys unless told to keep
+    # them (verified 2026-11-20: a custom tag written without the flag
+    # simply vanishes from the output). MKV/WebM keep custom keys
+    # natively, so the flag is only added for .mp4/.m4a outputs.
+    out_name = tool_call.get("output") or default_output(tool_call)
+    extra: list[str] = []
+    if Path(out_name).suffix.lower() in (".mp4", ".m4a"):
+        extra = ["-movflags", "use_metadata_tags"]
+    return argv[:-1] + ["-metadata", f"{CHAIN_KEY}={chain}"] + extra + [argv[-1]]
+
+
+def _build(tool_call: dict, probe: Probe, workdir: Path) -> list[str]:
     tool = tool_call["tool"]
     inp = str(workdir / tool_call["input"]) if "input" in tool_call else None
     out = str(workdir / tool_call.get("output", default_output(tool_call)))

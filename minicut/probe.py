@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+from .chain import CHAIN_KEY
+
+
 @dataclass
 class Probe:
     path: Path
@@ -19,6 +22,9 @@ class Probe:
     has_audio: bool
     has_video: bool
     format_name: str | None
+    # Edit-history chain from the minicut_chain metadata tag, if present.
+    # None on a fresh file or one whose metadata was stripped elsewhere.
+    chain: str | None = None
 
 
 def probe_file(path: str | Path) -> Probe:
@@ -43,6 +49,10 @@ def probe_file(path: str | Path) -> Probe:
             fps = float(num) / float(den) if float(den) else None
         except Exception:
             fps = None
+    # Metadata tags are case-insensitive in practice (MP4 stores them
+    # lowercased, MKV keeps the case written); match case-insensitively.
+    tags = fmt.get("tags", {}) or {}
+    chain = next((v for k, v in tags.items() if k.lower() == CHAIN_KEY), None)
     return Probe(
         path=path,
         duration_s=float(fmt.get("duration", 0) or 0),
@@ -54,4 +64,5 @@ def probe_file(path: str | Path) -> Probe:
         has_audio=audio is not None,
         has_video=video is not None,
         format_name=fmt.get("format_name"),
+        chain=chain,
     )
