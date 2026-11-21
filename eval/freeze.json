@@ -1,0 +1,208 @@
+{
+  "seed": 20261120,
+  "generated": "2026-11-20",
+  "splits": [
+    "eval_seen",
+    "eval_unseen_paraphrase",
+    "eval_unseen_combo",
+    "eval_unseen_fixture"
+  ],
+  "per_split_tool_counts": {
+    "eval_seen": {
+      "trim": 9,
+      "cut_out": 7,
+      "concat": 4,
+      "scale": 7,
+      "speed": 6,
+      "convert": 6,
+      "extract_audio": 5,
+      "mute": 4,
+      "clarify": 2
+    },
+    "eval_unseen_paraphrase": {
+      "trim": 9,
+      "cut_out": 7,
+      "concat": 4,
+      "scale": 7,
+      "speed": 6,
+      "convert": 6,
+      "extract_audio": 5,
+      "mute": 4,
+      "clarify": 2
+    },
+    "eval_unseen_combo": {
+      "trim": 9,
+      "cut_out": 7,
+      "concat": 4,
+      "scale": 7,
+      "speed": 6,
+      "convert": 6,
+      "extract_audio": 5,
+      "mute": 4,
+      "clarify": 2
+    },
+    "eval_unseen_fixture": {
+      "trim": 9,
+      "cut_out": 7,
+      "concat": 4,
+      "scale": 7,
+      "speed": 6,
+      "convert": 6,
+      "extract_audio": 5,
+      "mute": 4,
+      "clarify": 2
+    }
+  },
+  "heldout_template_ids": [
+    "clarify_h1",
+    "clarify_h2",
+    "concat_h1",
+    "concat_h2",
+    "concat_h3",
+    "convert_h1",
+    "convert_h2",
+    "convert_h3",
+    "cut_h1",
+    "cut_h2",
+    "cut_h3",
+    "extract_h1",
+    "extract_h2",
+    "extract_h3",
+    "mute_h1",
+    "mute_h2",
+    "mute_h3",
+    "mute_h4",
+    "scale_h1",
+    "scale_h2",
+    "scale_h3",
+    "speed_h1",
+    "speed_h2",
+    "speed_h3",
+    "trim_h1",
+    "trim_h2",
+    "trim_h3"
+  ],
+  "train_template_ids": [
+    "clarify_t1",
+    "clarify_t2",
+    "clarify_t3",
+    "concat_t1",
+    "concat_t2",
+    "concat_t3",
+    "concat_t4",
+    "convert_t1",
+    "convert_t2",
+    "convert_t3",
+    "cut_t1",
+    "cut_t2",
+    "cut_t3",
+    "cut_t4",
+    "cut_t5",
+    "extract_t1",
+    "extract_t2",
+    "extract_t3",
+    "mute_t1",
+    "mute_t2",
+    "mute_t3",
+    "mute_t4",
+    "scale_t1",
+    "scale_t2",
+    "scale_t3",
+    "scale_t4",
+    "speed_t1",
+    "speed_t2",
+    "speed_t3",
+    "speed_t4",
+    "trim_t1",
+    "trim_t2",
+    "trim_t3",
+    "trim_t4",
+    "trim_t5"
+  ],
+  "reserved_fixture": "long_60s_1080p",
+  "combo_arg_pools": {
+    "trim": [
+      [
+        5.0,
+        15.0
+      ],
+      [
+        8.0,
+        22.0
+      ],
+      [
+        0.0,
+        10.0
+      ],
+      [
+        15.0,
+        25.0
+      ]
+    ],
+    "cut_out": [
+      [
+        10.0,
+        20.0
+      ],
+      [
+        0.0,
+        10.0
+      ],
+      [
+        5.0,
+        25.0
+      ],
+      [
+        2.0,
+        8.0
+      ]
+    ],
+    "scale": [
+      [
+        854,
+        480
+      ],
+      [
+        1920,
+        1080
+      ],
+      [
+        720,
+        1280
+      ]
+    ],
+    "speed": [
+      0.25,
+      4.0,
+      1.5
+    ],
+    "convert": [
+      [
+        "vp9",
+        "webm",
+        23
+      ],
+      [
+        "libx265",
+        "mkv",
+        18
+      ],
+      [
+        "vp9",
+        "mkv",
+        23
+      ]
+    ],
+    "extract_audio": [
+      "aac",
+      "wav"
+    ]
+  },
+  "rules": [
+    "Held-out template ids must never be used in Phase 4 training data.",
+    "The reserved fixture must never be used in training data.",
+    "Combo arg pools must never be used in training data.",
+    "Eval cases must never be sampled into the training pool.",
+    "Do not edit these files after the baseline run; new runs get new files."
+  ]
+}

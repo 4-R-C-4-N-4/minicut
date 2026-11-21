@@ -1,0 +1,107 @@
+"""Validation: schema first, then semantic checks against the probe.
+
+Returns a list of human-readable errors. Empty list = valid.
+The grammar already constrains shape; this is the layer that can see
+the actual input file (duration, resolution, streams).
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from .probe import Probe
+
+TOOLS = {
+    "trim": {"start", "end"},
+    "cut_out": {"start", "end"},
+    "concat": {"inputs"},
+    "scale": {"width", "height"},
+    "speed": {"factor"},
+    "convert": {"codec", "container", "crf"},
+    "extract_audio": {"format"},
+    "mute": set(),
+    "clarify": {"question", "missing"},
+}
+CODECS = {"libx264", "libx265", "vp9"}
+CONTAINERS = {"mp4", "mkv", "webm"}
+AUDIO_FORMATS = {"mp3", "wav", "aac"}
+
+
+def _is_number(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def validate(tool_call: dict, probe: Probe | None, workdir: Path) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(tool_call, dict):
+        return ["tool call must be a JSON object"]
+    tool = tool_call.get("tool")
+    if tool not in TOOLS:
+        return [f"unknown tool: {tool!r}"]
+    if tool == "clarify":
+        if not isinstance(tool_call.get("question"), str) or not tool_call["question"].strip():
+            errors.append("clarify needs a non-empty question")
+        return errors
+
+    # Unknown / missing keys (input/output are common keys, not per-tool args).
+    allowed = TOOLS[tool] | {"tool", "input", "output", "inputs"}
+    for k in tool_call:
+        if k not in allowed:
+            errors.append(f"unknown key for {tool}: {k!r}")
+    # Per-tool required args (crf has a default, so not required).
+    required = TOOLS[tool] - ({"crf"} if tool == "convert" else set())
+    if tool == "concat":
+        if not isinstance(tool_call.get("inputs"), list) or len(tool_call.get("inputs", [])) < 2:
+            errors.append("concat needs inputs: a list of at least 2 files")
+    else:
+        if "input" not in tool_call:
+            errors.append(f"{tool} needs 'input'")
+        for a in required:
+            if a not in tool_call:
+                errors.append(f"{tool} needs '{a}'")
+    if errors:
+        return errors
+
+    # Path safety: relative, inside workdir, no "..".
+    for key in ("input", "output"):
+        if key in tool_call and isinstance(tool_call[key], str):
+            p = Path(tool_call[key])
+            if p.is_absolute() or ".." in p.parts:
+                errors.append(f"{key} must be a relative path inside the workdir: {tool_call[key]!r}")
+    if tool == "concat":
+        for f in tool_call["inputs"]:
+            p = Path(f)
+            if p.is_absolute() or ".." in p.parts:
+                errors.append(f"concat input must be relative: {f!r}")
+    if errors:
+        return errors
+    if probe is None:
+        return errors  # cannot do semantic checks without a probe
+
+    if tool in ("trim", "cut_out"):
+        s, e = tool_call["start"], tool_call["end"]
+        if not _is_number(s) or not _is_number(e):
+            errors.append("start/end must be numbers (seconds)")
+        elif not (0 <= s < e <= probe.duration_s):
+            errors.append(f"need 0 <= start < end <= duration ({probe.duration_s:.2f}s), got {s}..{e}")
+    if tool == "scale":
+        w, h = tool_call["width"], tool_call["height"]
+        if not isinstance(w, int) or not isinstance(h, int) or w <= 0 or h <= 0:
+            errors.append("width/height must be positive integers")
+        elif w % 2 or h % 2:
+            errors.append("width/height must be even (yuv420p)")
+    if tool == "speed":
+        f = tool_call["factor"]
+        if not _is_number(f) or not (0.25 <= f <= 4.0):
+            errors.append(f"speed factor must be 0.25..4.0, got {f!r}")
+    if tool == "convert":
+        if tool_call["codec"] not in CODECS:
+            errors.append(f"codec not allowlisted: {tool_call['codec']!r}")
+        if tool_call["container"] not in CONTAINERS:
+            errors.append(f"container not allowlisted: {tool_call['container']!r}")
+        crf = tool_call.get("crf", 23)
+        if not isinstance(crf, int) or not (0 <= crf <= 51):
+            errors.append(f"crf must be int 0..51, got {crf!r}")
+    if tool == "extract_audio":
+        if tool_call["format"] not in AUDIO_FORMATS:
+            errors.append(f"audio format not allowlisted: {tool_call['format']!r}")
+    return errors

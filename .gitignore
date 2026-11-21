@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+factory/fixtures/
+*.mp4
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.gguf
+*.safetensors
+*.bin
+models/
+llama.cpp/
+adapters/
+.venv/
+*.log

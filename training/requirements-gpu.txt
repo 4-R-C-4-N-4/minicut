@@ -1,0 +1,7 @@
+# Install on the GPU machine only (Ivy's local GPU, not the CPU-only VM).
+# torch: install the CUDA build matching the machine's CUDA version,
+# e.g. pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch
+transformers>=4.44
+peft>=0.12
+accelerate>=0.34
