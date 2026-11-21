@@ -705,6 +705,23 @@ in chat only.
   mid-paraphrase; seen was already saved and the other three splits
   were resumed after a server restart + warmup. Baseline_v3 is the
   number Phase 4 (LoRA) has to beat.
+- 2026-11-21: Phase 4 dataset v1 built (`training/train_v1.jsonl`,
+  3000 examples, seed 20261121, generator
+  `training/generate_dataset.py`). Label first, prompt derived from
+  it; every label validated against its fixture probe (0 failures).
+  Freeze compliance: arg pools disjoint from eval seen AND combo
+  pools where possible; extract mp3-only (combo pool is {aac, wav});
+  mute/concat/clarify use fresh paraphrases because eval exhausts
+  their train templates; every (prompt, label) checked against all
+  200 eval cases (272 collisions dropped, 0 in the final file).
+  Cut_out "remove this range" phrasings avoid the held-out cut_h3
+  wording. Clarify 350 (exact minimal missing lists), general mix
+  360 hand-written Q&A (12%). Filenames vary across 30 names so
+  low-entropy tools have distinct pairs; clip.mp4 is still 559/3000.
+  Wrapper sample check: 200/200 pass. `training/lora_config.yaml`
+  is the §8.1 starting point (r16, alpha 32, lr 1e-4, 2 epochs);
+  training runs on Ivy's local GPU, not this CPU box. No training
+  started here — dataset only.
 
 ## 12. Sources
 
