@@ -108,6 +108,19 @@ class TestWrapper(unittest.TestCase):
             self.assertEqual({p.name for p in Path(destination).iterdir()}, {"input_trim.mp4"})
         self.assertEqual({p.name for p in self.tmp.iterdir()}, {"input.mp4"})
 
+    def test_noop_edit_is_rejected_without_rendering(self):
+        for call in (
+            {"tool": "trim", "input": "input.mp4", "start": 0.0, "end": 30.0},
+            {"tool": "speed", "input": "input.mp4", "factor": 1.0},
+            {"tool": "scale", "input": "input.mp4", "width": 1280, "height": 720},
+        ):
+            with self.subTest(call=call), patch("minicut.wrapper.run") as render:
+                result = edit(dict(call), self.tmp)
+                self.assertFalse(result["ok"], result)
+                self.assertIn("would not change", result["error"])
+                render.assert_not_called()
+        self.assertEqual({p.name for p in self.tmp.iterdir()}, {"input.mp4"})
+
     def test_publish_preserves_dangling_symlink(self):
         occupied = self.tmp / "input_trim.mp4"
         target = self.tmp / "absent.mp4"

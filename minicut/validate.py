@@ -24,6 +24,8 @@ TOOLS = {
 CODECS = {"libx264", "libx265", "vp9"}
 CONTAINERS = {"mp4", "mkv", "webm"}
 AUDIO_FORMATS = {"mp3", "wav", "aac"}
+# A trim this close to the full clip at both ends keeps everything.
+NOOP_TRIM_TOL_S = 0.05
 
 
 def _is_number(v) -> bool:
@@ -80,16 +82,22 @@ def validate(tool_call: dict, probe: Probe | None, workdir: Path) -> list[str]:
             errors.append("start/end must be numbers (seconds)")
         elif not (0 <= s < e <= probe.duration_s):
             errors.append(f"need 0 <= start < end <= duration ({probe.duration_s:.2f}s), got {s}..{e}")
+        elif tool == "trim" and s <= NOOP_TRIM_TOL_S and e >= probe.duration_s - NOOP_TRIM_TOL_S:
+            errors.append("this trim keeps the whole clip, so it would not change anything")
     if tool == "scale":
         w, h = tool_call["width"], tool_call["height"]
         if not isinstance(w, int) or not isinstance(h, int) or w <= 0 or h <= 0:
             errors.append("width/height must be positive integers")
         elif w % 2 or h % 2:
             errors.append("width/height must be even (yuv420p)")
+        elif (w, h) == (probe.width, probe.height):
+            errors.append(f"the clip is already {w}x{h}, so this would not change anything")
     if tool == "speed":
         f = tool_call["factor"]
         if not _is_number(f) or not (0.25 <= f <= 4.0):
             errors.append(f"speed factor must be 0.25..4.0, got {f!r}")
+        elif f == 1:
+            errors.append("speed 1x would not change anything")
     if tool == "convert":
         if not isinstance(tool_call["codec"], str) or tool_call["codec"] not in CODECS:
             errors.append(f"codec not allowlisted: {tool_call['codec']!r}")
