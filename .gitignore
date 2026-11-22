@@ -17,3 +17,5 @@ adapters/
 training/output/
 .venv/
 *.log
+build/
+*.egg-info/

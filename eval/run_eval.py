@@ -14,19 +14,16 @@ import shutil
 import sys
 import tempfile
 import time
-import urllib.request
-import urllib.error
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from minicut.llm.prompts import edit_messages  # noqa: E402
+from minicut.llm.client import predict  # noqa: E402
 from minicut.wrapper import edit  # noqa: E402
 
 EVAL_DIR = ROOT / "eval"
 FIXTURES_DIR = ROOT / "factory" / "fixtures"
-GRAMMAR_PATH = ROOT / "minicut" / "grammar" / "minicut.gbnf"
 SCORER = "intent_v2"
 
 # Args compared for exact equality, per tool. input/output are excluded:
@@ -81,40 +78,8 @@ def _expected_intent(case: dict) -> dict:
 
 
 def _http_predict(prompt: str, base_url: str, use_grammar: bool, timeout_s: int = 120) -> str:
-    """One chat completion from a llama.cpp server. Returns raw content."""
-    body: dict = {
-        "messages": edit_messages(prompt),
-        "temperature": 0.0,
-        "max_tokens": 256,
-        "stream": False,
-        # Thinking OFF (spec v1): MiniCPM5-2B's chat template enables
-        # thinking by default, which puts the tool call in
-        # reasoning_content and leaves content empty. Verified 2026-11-20:
-        # with enable_thinking=false the JSON lands in content.
-        "chat_template_kwargs": {"enable_thinking": False},
-    }
-    if use_grammar:
-        body["grammar"] = GRAMMAR_PATH.read_text()
-    req = urllib.request.Request(
-        f"{base_url.rstrip('/')}/v1/chat/completions",
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            data = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"llama.cpp server HTTP {e.code}: {e.read().decode()[:300]}")
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"cannot reach llama.cpp server at {base_url}: {e.reason}")
-    try:
-        msg = data["choices"][0]["message"]
-        # Fallback for servers that return the answer as reasoning
-        # (thinking mode on): prefer content, else reasoning_content.
-        return msg.get("content") or msg.get("reasoning_content") or ""
-    except (KeyError, IndexError, TypeError):
-        raise RuntimeError(f"unexpected server response: {json.dumps(data)[:300]}")
+    """One chat completion from a llama.cpp server, via the CLI's client."""
+    return predict(prompt, base_url, use_grammar=use_grammar, timeout_s=timeout_s)
 
 
 def _run_case(case: dict, predict) -> dict:

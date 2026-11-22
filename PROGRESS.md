@@ -1,5 +1,12 @@
 # MiniCut progress
 
+## CLI with stock model
+
+- `minicut REQUEST FILE...` (`minicut/cli.py`, packaged as a console script): asks local llama.cpp for one tool call, binds it to the given files, validates against ffprobe, then renders one verified derivative, or previews with `--preview`. `--output-dir`, `--json`, exit codes in README. The model client is shared with the dev eval (`minicut/llm/client.py`).
+- `validate()` now rejects edits that would change nothing (trim covering the whole clip, speed 1x, scale to current size). No dev, release or pilot label is a no-op.
+- Fresh wheel install outside the source tree, then real stock MiniCPM5-2B Q4_K_M on llama.cpp `01818e495` (RTX 3090), base and short fixtures: remove 5–12s, scale 640x360, a.mp4-then-b.mp4 concat and preview were correct. Impossible 20–45s on 30s was rejected. "make clip.mp4 shorter" came back as a whole-clip trim and was rejected as a no-op instead of rendering. "keep only 5 to 12 seconds" came back as keep 0–12s, with or without the filename in the request; the plan line shows it. Sources were byte-identical in all 8 runs; no files were written for rejections or preview.
+- 55 tests pass; release controls still pass. `nvidia-smi` currently fails with a driver/library version mismatch (CUDA itself works); a reboot should clear it.
+
 ## Release benchmark (frozen, controls only)
 
 - `eval/release/`: 38 pinned cases separate from the 200 development cases and training data — 16 keep/remove, 8 ambiguous, 6 distinct-file concat orders, 8 other tools — on three new synthetic fixtures. Each attempt is graded separately on intent (the output's measured effect versus the expected edit) and source preservation (SHA-256).

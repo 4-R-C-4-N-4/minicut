@@ -12,6 +12,32 @@ output. See `spec.md` and `IMPLEMENTATION_GUIDE.md`.
 trim, cut_out, concat, scale, speed, convert, extract_audio, mute —
 plus `clarify` for missing/ambiguous args.
 
+## Use it
+
+Needs `ffmpeg`/`ffprobe` and a local llama.cpp server running MiniCPM5-2B
+(stock GGUF; the trained adapter is not yet release-approved).
+
+```bash
+pip install .
+llama-server -m MiniCPM5-2B-Q4_K_M.gguf --jinja -ngl all --port 8080
+
+minicut "remove 5 to 12 seconds" clip.mp4
+minicut "join a.mp4 and then b.mp4" a.mp4 b.mp4 --output-dir renders/
+minicut "keep only 5 to 12 seconds" clip.mp4 --preview   # show the plan, write nothing
+```
+
+Each run makes at most one new, verified file and prints what actually ran
+(`done: remove 5.0-12.0s from clip.mp4 and keep the other 23.0s`). Read that
+line: verification proves the file matches the plan, not that the model
+understood you. Sources are never modified. MiniCut picks the files you
+name; the model never chooses paths. Edits that would change nothing are
+rejected. Use `--llm-url` or `MINICUT_LLM_URL` for another server, and
+`--json` for scripting. Exit codes: 0 done or previewed, 1 rejected or
+failed, 2 usage/model/file error, 3 the model asked a question.
+
+Known limit: stock MiniCPM5-2B can misread ranges; in testing it turned
+"keep only 5 to 12 seconds" into keep 0–12s.
+
 ## Quickstart
 
 ```bash

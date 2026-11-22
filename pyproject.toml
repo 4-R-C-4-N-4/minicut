@@ -16,5 +16,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
+[project.scripts]
+minicut = "minicut.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["minicut*", "factory*"]
+
+[tool.setuptools.package-data]
+minicut = ["grammar/*.gbnf"]
