@@ -124,22 +124,25 @@ Ambiguity handling is a first-class output, not a failure:
 
 Responsibilities, in order:
 
-1. **Probe:** `ffprobe -show_format -show_streams` → duration,
-   resolution, fps, codecs, audio streams, audio sample rate.
-2. **Validate:** schema check (grammar already did most of this),
-   then semantic check: times in range, crop in bounds, scale dims
-   even, output path inside the sandbox/workdir, no overwrite of the
-   input unless explicitly allowed.
+1. **Validate and probe:** check the schema and resolve input files inside
+   the workdir before running `ffprobe`. Then check probe-dependent constraints
+   such as times in range and even scale dimensions.
+2. **Choose destination:** default to the workdir; the application can set
+   `output_dir`. Ignore model-proposed output names. Sources and any existing
+   outputs are never overwritten by the wrapper. There is no in-place mode.
 3. **Build:** deterministic template per tool. One template per tool,
    tested. No string concatenation of user text into a command.
-4. **Run:** argv list, capture stdout/stderr, timeout per job.
+4. **Run:** argv list, capture stdout/stderr, timeout per job. Render into a
+   private staging directory on the destination filesystem.
 5. **Verify:** same checks as the test factory (§8) — duration,
    dimensions, codec, stream presence. A zero exit code is not enough.
 6. **Retry:** on failure, feed the probe + stderr back to the model
    as a tool result and ask for a corrected JSON call. Max 2 retries,
    then report the error plainly.
-7. **Report:** output path + what changed (duration, size, codec),
-   or the clarification question.
+7. **Publish and report:** only after verification, atomically create a new
+   output directory entry without replacing an existing name; bump the version
+   suffix on collision. Handled failures clean staging without publishing a
+   result. Report the new output or the clarification question.
 
 ## 7. Safety
 

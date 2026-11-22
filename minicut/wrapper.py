@@ -6,9 +6,10 @@ JSON call, max 2 retries, then reports the error plainly.
 """
 from __future__ import annotations
 
-import json
+import os
 import tempfile
 from pathlib import Path
+from subprocess import TimeoutExpired
 from typing import Callable
 
 from . import build as build_mod
@@ -20,107 +21,83 @@ from .verify import verify_output
 MAX_RETRIES = 2
 
 
-def _resolve_output(tool_call: dict, workdir: Path, inputs: list[str]) -> Path:
-    """Wrapper-owned output name: the model's `output` field is ignored
-    entirely (it was the source of the baseline_v2 execution failures —
-    a model-chosen `.vp9` extension ffmpeg cannot mux, and a raw `.aac`
-    that under-reports duration). The name is stem + one op token.
-    Never overwrites: if the derived name exists, bump _v2, _v3, ...
-    Never modifies an input in place: the derived name is bumped away
-    from any input path too."""
-    name = build_mod.default_output(tool_call)
-    out = workdir / name
-    stem, suffix = out.stem, out.suffix
-    input_paths = {workdir / f for f in inputs}
+def _publish(staged: Path, dest: Path) -> Path:
+    """Publish on the same filesystem without copying or replacing any entry."""
+    out = dest / staged.name
     n = 2
-    while out.exists() or out in input_paths:
-        out = workdir / f"{stem}_v{n}{suffix}"
-        n += 1
-    return out
+    while True:
+        try:
+            os.link(staged, out)
+        except FileExistsError:
+            out = dest / f"{staged.stem}_v{n}{staged.suffix}"
+            n += 1
+        else:
+            return out
 
 
 def edit(tool_call: dict, workdir: str | Path,
-         llm: Callable[[dict], dict] | None = None) -> dict:
+         llm: Callable[[dict], dict] | None = None, *,
+         output_dir: str | Path | None = None) -> dict:
+    """Render a new derivative; only the application may choose output_dir."""
     workdir = Path(workdir)
-    workdir.mkdir(parents=True, exist_ok=True)
-    tool = tool_call.get("tool")
-
-    if tool == "clarify":
-        errors = validate(tool_call, None, workdir)
+    dest = Path(output_dir) if output_dir is not None else workdir
+    call = tool_call
+    for attempt in range(MAX_RETRIES + 1):
+        if not isinstance(call, dict):
+            return {"ok": False, "error": "tool call must be a JSON object"}
+        call = {k: v for k, v in call.items() if k != "output"}
+        errors = validate(call, None, workdir)
         if errors:
             return {"ok": False, "error": "; ".join(errors)}
-        return {"ok": True, "clarify": tool_call.get("question"),
-                "missing": tool_call.get("missing", [])}
-
-    # Probe the primary input (concat probes all inputs).
-    try:
-        if tool == "concat":
-            probes = {f: probe_file(workdir / f) for f in tool_call.get("inputs", [])}
-            probe = next(iter(probes.values())) if probes else None
-        else:
-            probe = probe_file(workdir / tool_call["input"])
-            probes = {tool_call["input"]: probe}
-    except (FileNotFoundError, RuntimeError) as e:
-        return {"ok": False, "error": str(e)}
-
-    errors = validate(tool_call, probe, workdir)
-    if errors:
-        return {"ok": False, "error": "; ".join(errors)}
-
-    # Resolve the output once, up front: build() writes to it, and
-    # retries reuse the same path (they must not bump it again).
-    inputs = list(tool_call.get("inputs", [])) or [tool_call["input"]]
-    out_path = _resolve_output(tool_call, workdir, inputs)
-
-    call = dict(tool_call)
-    attempt = 0
-    while True:
-        # Force the wrapper-derived name: any model-chosen output is
-        # overwritten here, every attempt, so ffmpeg can never be sent
-        # a bad extension or an in-place path.
-        call = dict(call, output=out_path.name)
-        # Concat needs a demuxer list file.
-        list_file = None
-        if call["tool"] == "concat":
-            with tempfile.NamedTemporaryFile("w", suffix=".txt", dir=workdir,
-                                            delete=False) as fh:
-                for f in call["inputs"]:
-                    fh.write(f"file '{workdir / f}'\n")
-                list_file = fh.name
-            call = dict(call, _list_file=list_file)
+        tool = call["tool"]
+        if tool == "clarify":
+            return {"ok": True, "clarify": call["question"], "missing": call.get("missing", [])}
+        files = call["inputs"] if tool == "concat" else [call["input"]]
         try:
-            argv = build_mod.build(call, probe, workdir)
-            result = run(argv)
-        finally:
-            if list_file:
-                Path(list_file).unlink(missing_ok=True)
-        if result.exit_code != 0:
-            err = result.stderr.strip()[-800:]
-            if llm and attempt < MAX_RETRIES:
-                attempt += 1
-                call = llm({"failed_call": call, "stderr": err,
-                            "probe": {"duration_s": probe.duration_s,
-                                      "width": probe.width, "height": probe.height,
-                                      "has_audio": probe.has_audio}})
-                continue
-            return {"ok": False, "error": f"ffmpeg failed (exit {result.exit_code}): {err}",
-                    "argv": argv}
-        passed, reason = verify_output(call, out_path, probe, probes)
-        if not passed:
-            if llm and attempt < MAX_RETRIES:
-                attempt += 1
-                call = llm({"failed_call": call, "verification": reason,
-                            "probe": {"duration_s": probe.duration_s,
-                                      "width": probe.width, "height": probe.height,
-                                      "has_audio": probe.has_audio}})
-                continue
-            return {"ok": False, "error": f"verification failed: {reason}",
-                    "output": str(out_path)}
-        # Chain as actually written into the output file, read back
-        # from its metadata — ground truth, not what we hoped to write.
-        try:
-            chain = probe_file(out_path).chain
-        except Exception:
-            chain = None
-        return {"ok": True, "output": str(out_path), "verification": reason,
-                "chain": chain, "retries": attempt}
+            root = workdir.resolve()
+            paths = {f: (root / f).resolve(strict=True) for f in files}
+            if any(not p.is_relative_to(root) or not p.is_file() for p in paths.values()):
+                return {"ok": False, "error": "inputs must be regular files inside the workspace"}
+            probes = {f: probe_file(p) for f, p in paths.items()}
+            probe = probes[files[0]]
+            errors = validate(call, probe, workdir)
+            if errors:
+                return {"ok": False, "error": "; ".join(errors)}
+            dest.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix=".minicut-", dir=dest) as staging:
+                staged = Path(staging).absolute() / build_mod.default_output(call)
+                render_call = dict(call, output=str(staged))
+                if tool != "concat":
+                    render_call["input"] = str(paths[files[0]])
+                if tool == "concat":
+                    listing = staged.parent / "inputs.ffconcat"
+                    entries = [str(paths[f]) for f in files]
+                    if any("\n" in p or "\r" in p for p in entries):
+                        return {"ok": False, "error": "concat paths must not contain line breaks"}
+                    quoted = [p.replace("'", "'\\''") for p in entries]
+                    listing.write_text("".join(f"file '{p}'\n" for p in quoted))
+                    render_call["_list_file"] = str(listing)
+                argv = build_mod.build(render_call, probe, workdir)
+                result = run(argv)
+                if result.exit_code != 0:
+                    detail = {"stderr": result.stderr.strip()[-800:]}
+                    error = f"ffmpeg failed (exit {result.exit_code}): {detail['stderr']}"
+                else:
+                    passed, reason = verify_output(call, staged, probe, probes)
+                    if passed:
+                        chain = probe_file(staged).chain
+                        output = _publish(staged, dest)
+                        return {"ok": True, "output": str(output), "verification": reason,
+                                "chain": chain, "retries": attempt}
+                    detail = {"verification": reason}
+                    error = f"verification failed: {reason}"
+        except TimeoutExpired:
+            return {"ok": False, "error": "media command timed out"}
+        except (OSError, RuntimeError, ValueError) as exc:
+            return {"ok": False, "error": str(exc)}
+        if llm is None or attempt == MAX_RETRIES:
+            return {"ok": False, "error": error}
+        call = llm({"failed_call": call, **detail,
+                    "probe": {"duration_s": probe.duration_s, "width": probe.width,
+                              "height": probe.height, "has_audio": probe.has_audio}})
+    raise AssertionError("retry loop exhausted without a result")

@@ -35,7 +35,7 @@ def validate(tool_call: dict, probe: Probe | None, workdir: Path) -> list[str]:
     if not isinstance(tool_call, dict):
         return ["tool call must be a JSON object"]
     tool = tool_call.get("tool")
-    if tool not in TOOLS:
+    if not isinstance(tool, str) or tool not in TOOLS:
         return [f"unknown tool: {tool!r}"]
     if tool == "clarify":
         if not isinstance(tool_call.get("question"), str) or not tool_call["question"].strip():
@@ -61,17 +61,14 @@ def validate(tool_call: dict, probe: Probe | None, workdir: Path) -> list[str]:
     if errors:
         return errors
 
-    # Path safety: relative, inside workdir, no "..".
-    for key in ("input", "output"):
-        if key in tool_call and isinstance(tool_call[key], str):
-            p = Path(tool_call[key])
-            if p.is_absolute() or ".." in p.parts:
-                errors.append(f"{key} must be a relative path inside the workdir: {tool_call[key]!r}")
-    if tool == "concat":
-        for f in tool_call["inputs"]:
-            p = Path(f)
-            if p.is_absolute() or ".." in p.parts:
-                errors.append(f"concat input must be relative: {f!r}")
+    files = tool_call["inputs"] if tool == "concat" else [tool_call["input"]]
+    if "output" in tool_call:
+        files = [*files, tool_call["output"]]
+    for f in files:
+        if not isinstance(f, str) or not f or "\0" in f:
+            errors.append("paths must be non-empty strings")
+        elif Path(f).is_absolute() or ".." in Path(f).parts:
+            errors.append(f"path must be relative and inside the workdir: {f!r}")
     if errors:
         return errors
     if probe is None:
@@ -94,14 +91,14 @@ def validate(tool_call: dict, probe: Probe | None, workdir: Path) -> list[str]:
         if not _is_number(f) or not (0.25 <= f <= 4.0):
             errors.append(f"speed factor must be 0.25..4.0, got {f!r}")
     if tool == "convert":
-        if tool_call["codec"] not in CODECS:
+        if not isinstance(tool_call["codec"], str) or tool_call["codec"] not in CODECS:
             errors.append(f"codec not allowlisted: {tool_call['codec']!r}")
-        if tool_call["container"] not in CONTAINERS:
+        if not isinstance(tool_call["container"], str) or tool_call["container"] not in CONTAINERS:
             errors.append(f"container not allowlisted: {tool_call['container']!r}")
         crf = tool_call.get("crf", 23)
         if not isinstance(crf, int) or not (0 <= crf <= 51):
             errors.append(f"crf must be int 0..51, got {crf!r}")
     if tool == "extract_audio":
-        if tool_call["format"] not in AUDIO_FORMATS:
+        if not isinstance(tool_call["format"], str) or tool_call["format"] not in AUDIO_FORMATS:
             errors.append(f"audio format not allowlisted: {tool_call['format']!r}")
     return errors
