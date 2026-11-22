@@ -1,0 +1,10 @@
+# MiniCut pre-GPU plan
+
+Goal: test whether a small LoRA improves one-shot interpretation of explicit video-edit requests. Keep ffprobe, argument validation, output naming, FFmpeg, and verification in the wrapper. Do not spend GPU time in this phase.
+
+1. **Corpus:** derive a versioned JSON-only pilot from v1, retaining its provenance and split restrictions. Drop prompts that need hidden fixture information, repair omitted/default arguments and unclear repeat counts, and require unique user prompts and valid tool labels. Verify reproducible bytes and run a wrapper sample.
+2. **Trainer:** use the deployed no-thinking chat prefix and supervise only answer + native turn terminator. Reject clipping or token-boundary mismatches before model load. Add CPU preflight and bounded optimizer smoke controls. Keep the current adapter recipe for the first test.
+3. **Development grader:** retain frozen inputs and historical reports. Score intent separately from execution, normalize only documented v1 oracle defects, and test wrong-but-executable negatives and a passing oracle. Historical runtime results are not a matched control.
+4. **Next, hardware smoke:** pin checkpoint, packages, server build, and device; record identities and digests. Run a few real update steps; require finite loss and changed adapter weights, then convert and load the adapter. Use the [training runbook](../training/README.md).
+5. **Development comparison:** compare stock and tuned using the same GGUF base, server, prompt, grammar, and decoding. Pair rows by ID and inspect gains and losses, especially keep/remove and false clarifications. Use the current 200 requests for development, not release claims. If no useful gain, diagnose by tool/contrast before spending more compute.
+6. **Release gate:** independently author and freeze new requests before checkpoint selection; calibrate with positive and wrong-but-executable controls. Score the selected deployment artifact and same-runtime stock; reject material regressions and keep the stock fallback. Relative edits, multi-turn recovery, and general Q&A are outside the pilot.

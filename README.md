@@ -32,17 +32,30 @@ print(edit({"tool": "trim", "input": "clip.mp4", "start": 12.0, "end": 27.0}, Pa
 PY
 ```
 
-## Eval (Phase 3)
+## Output policy
+
+MiniCut leaves source clips unchanged and gives each successful edit a new
+file. The wrapper ignores model-proposed output names, renders privately, then
+publishes the verified result under an unused name without copying it again.
+Handled failures and timeouts do not publish a derivative. Verification checks
+the selected operation, not whether the model understood the request.
+
+By default, derivatives go in the workdir. Pass `output_dir=Path(...)` to
+`edit()` to put them on another drive. Publication requires a destination
+filesystem that supports hard links. There is no in-place or automatic
+deletion mode.
+
+## Development eval and training
+
+See [progress](PROGRESS.md), the [pre-GPU plan](docs/pre-gpu-plan.md), and
+the [training runbook](training/README.md). The existing eval inputs are frozen.
 
 ```bash
-# Generate the frozen splits (seed 20261120, deterministic)
-python -m eval.generate_eval --out eval
-
 # Sanity: prove harness + cases execute (NOT a baseline)
-python -m eval.run_eval --all --backend oracle --label sanity_oracle --out eval/results
+python -m eval.run_eval --all --backend oracle --out "$(mktemp -d)"
 
 # Real baseline (needs llama-server + MiniCPM5-2B GGUF)
-python -m eval.run_eval --all --backend http --label baseline_v1 --out eval/results
+python -m eval.run_eval --all --backend http --label baseline_intent_v2 --out eval/results
 ```
 
 ## Layout

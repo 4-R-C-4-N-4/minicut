@@ -27,46 +27,32 @@ data exists**, so training cannot leak into them.
 5. Do not edit the frozen JSONL files after the baseline run. New runs
    get new files; the baseline file is never overwritten.
 
-## How to run the baseline
-
-Needs a llama.cpp server with the MiniCPM5-2B GGUF loaded, thinking off:
+## Run the intent-aware development eval
 
 ```bash
-# terminal 1: start the server (model path is yours to choose)
-llama-server -m <path-to-minicpm5-2b.gguf> --port 8080
-
-# terminal 2: baseline, all four splits
-python -m eval.run_eval --all --backend http --label baseline_v1 --out eval/results
+# Use a matching MiniCPM5-2B GGUF on a private llama.cpp server with --jinja.
+python -m eval.run_eval --all --backend http --label baseline_intent_v2 --out eval/results
+# Full CPU control: no model or server involved.
+python -m eval.run_eval --all --backend oracle --out "$(mktemp -d)"
 ```
 
-The harness sends the system prompt + few-shot examples from
-`minicut/llm/prompts.py`, temperature 0, and the GBNF grammar from
-`minicut/grammar/minicut.gbnf`. If your llama.cpp version ignores the
-`grammar` field in chat completions, pass `--no-grammar` — the run log
-will record that the grammar was not enforced.
+The HTTP evaluator sends the shared system and few-shot messages, greedy decoding,
+thinking off, and the GBNF grammar by default. Keep those settings fixed between
+stock and adapter. Use a separate label per run; the runner refuses to overwrite
+existing reports. The four frozen splits are development evidence, not a release set.
+The independent release suite lives in [`release/`](release/README.md).
 
-## What the numbers mean
+`intent_v2` records parse/tool/argument agreement and wrapper media verification
+separately. `task_pass` requires the intended action and canonical arguments plus
+verified media, or an accepted clarification with exactly the expected missing
+fields. The grader does not judge the wording of clarification questions.
 
-Per case: parse_ok (valid JSON tool call), tool_correct, args_correct
-(input/output ignored — the wrapper derives output), execution_ok,
-verification_pass (ffprobe/colour/tone checks, not just exit code 0).
-The headline number is **verification pass rate on the unseen splits**.
-Per the guide: if the base model is already ≥80% on simple edits, LoRA
-is for tightening format and edge cases; if below, LoRA is the main lever.
-Either way the decision gets recorded in `results/baseline_v1_*.md`,
-not assumed.
-
-## Sanity check (no model needed)
-
-```bash
-python -m eval.run_eval --all --backend oracle --label sanity_oracle --out eval/results
-```
-
-Oracle feeds each case's expected JSON straight to the wrapper. It
-proves the harness and every eval case execute end to end. See
-`results/sanity_oracle_*.md` for the latest run — it must read 100%
-on all four splits before the baseline means anything. It is not a
-baseline and the harness refuses to label it one.
+The frozen files were not edited. In v2, unspecified CRF means the documented
+wrapper default (23), and the two bare “with itself” concat phrasings mean two
+copies. Reports retain `frozen_expected` wherever the overlay changed a label.
+The oracle runs the normalized intent through the wrapper; its score is a fixture
+and harness check, not a model score. `baseline_v1`–`baseline_v3` are historical
+and their legacy verification rates are not comparable to `task_pass`.
 
 ## Things found while building this
 

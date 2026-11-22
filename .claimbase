@@ -1,0 +1,4 @@
+# Claimbase project identity. Commit this file: memory for everything
+# under this directory is filed under the name below, whatever the
+# directory is called or wherever it is cloned.
+project = "minicut"

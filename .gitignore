@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 factory/fixtures/
+eval/release/fixtures/
 *.mp4
 *.mkv
 *.webm
@@ -13,5 +14,6 @@ factory/fixtures/
 models/
 llama.cpp/
 adapters/
+training/output/
 .venv/
 *.log
