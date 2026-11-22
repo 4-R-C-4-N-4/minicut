@@ -90,3 +90,4 @@ python -m eval.run_eval --all --backend http --label baseline_intent_v2 --out ev
 - `factory/` — fixture generator + fixture verifier
 - `config/tools.yaml` — tool registry (source of truth)
 - `tests/` — wrapper tests, 8 tools + negative checks
+- `formal/dafny/` — Dafny dictionary for v1 (`minicut.dfy`, 32 verified): the tools as types, validity + expected-output postconditions, chain and never-overwrite invariants, clarify exactness. See `formal/dafny/README.md`. No change to runtime code.
