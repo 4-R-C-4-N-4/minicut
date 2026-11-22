@@ -16,7 +16,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from eval.run_eval import _args_correct, _http_predict, _run_case  # noqa: E402
+from eval.run_eval import _args_correct, _expected_intent, _http_predict, _run_case  # noqa: E402
+from minicut.llm.prompts import edit_messages  # noqa: E402
 
 
 class TestArgsCorrect(unittest.TestCase):
@@ -30,6 +31,17 @@ class TestArgsCorrect(unittest.TestCase):
                "container": "mp4", "crf": 23}
         self.assertTrue(_args_correct(exp, {k: v for k, v in exp.items() if k != "crf"}))
 
+    def test_oracle_overlay_repairs_only_unstated_values(self):
+        for prompt, explicit, label, key, default in (
+            ("convert clip.mp4 to mkv with libx264", " at CRF 28",
+             {"tool": "convert", "codec": "libx264", "container": "mkv", "crf": 28}, "crf", 23),
+            ("concatenate clip.mp4 with itself", " three times",
+             {"tool": "concat", "inputs": ["clip.mp4"] * 3}, "inputs", ["clip.mp4"] * 2),
+        ):
+            self.assertEqual(_expected_intent({"prompt": prompt, "expected": label})[key], default)
+            self.assertEqual(_expected_intent({"prompt": prompt + explicit, "expected": label}), label)
+            self.assertNotEqual(label[key], default)
+
     def test_clarify_compares_missing_set_not_question(self):
         exp = {"tool": "clarify", "question": "What times?", "missing": ["start", "end"]}
         pred = {"tool": "clarify", "question": "Something else entirely", "missing": ["end", "start"]}
@@ -38,6 +50,16 @@ class TestArgsCorrect(unittest.TestCase):
 
 
 class TestOracleScoring(unittest.TestCase):
+    def test_verified_wrong_edit_is_not_task_success(self):
+        case = {"id": "control", "split": "dev", "fixture": "base_30s",
+                "prompt": "Keep only seconds 2 through 8 of clip.mp4",
+                "expected": {"tool": "trim", "input": "clip.mp4", "start": 2, "end": 8}}
+        for call in ({**case["expected"], "tool": "cut_out"},
+                     {"tool": "clarify", "question": "What times?", "missing": ["start", "end"]}):
+            out = _run_case(case, lambda _: json.dumps(call))
+            self.assertTrue(out["execution_ok"], out)
+            self.assertFalse(out["task_pass"], out)
+
     def test_generated_cases_execute(self):
         rows = [json.loads(l) for l in
                 (ROOT / "eval" / "eval_seen.jsonl").read_text().splitlines()]
@@ -48,7 +70,8 @@ class TestOracleScoring(unittest.TestCase):
             self.assertTrue(out["parse_ok"], out)
             self.assertTrue(out["tool_correct"], out)
             self.assertTrue(out["args_correct"], out)
-            self.assertTrue(out["verification_pass"], out)
+            self.assertTrue(out["task_pass"], out)
+            self.assertEqual(out["verification_pass"], case is trim, out)
 
 
 class FakeLlamaHandler(BaseHTTPRequestHandler):
@@ -78,7 +101,8 @@ class TestHttpClient(unittest.TestCase):
         body = server.last_body
         self.assertEqual(body["temperature"], 0.0)
         self.assertIn("grammar", body)
-        self.assertEqual(body["messages"][0]["role"], "system")
+        self.assertEqual(body["messages"], edit_messages("mute clip.mp4"))
+        self.assertEqual(body["chat_template_kwargs"], {"enable_thinking": False})
         server.server_close()
 
 

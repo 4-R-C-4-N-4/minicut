@@ -36,3 +36,12 @@ RETRY_PROMPT = (
     "Your last tool call failed. Here is the probe and the error. "
     "Return a corrected JSON tool call, nothing else."
 )
+
+
+def edit_messages(prompt: str) -> list[dict[str, str]]:
+    """Shared editing context for HTTP eval and LoRA training."""
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for user, assistant in FEW_SHOT:
+        messages.extend(({"role": "user", "content": user},
+                         {"role": "assistant", "content": assistant}))
+    return [*messages, {"role": "user", "content": prompt}]
