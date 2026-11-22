@@ -1,0 +1,8 @@
+{
+  "rel_interview_18s": {"duration": 18, "width": 1280, "height": 720, "fps": 30, "audio": true,
+                        "segments": [["yellow", 330], ["cyan", 660], ["magenta", 990]]},
+  "rel_broll_12s": {"duration": 12, "width": 1280, "height": 720, "fps": 30, "audio": true,
+                    "segments": [["black", 550], ["white", 1100]]},
+  "rel_phone_10s": {"duration": 10, "width": 720, "height": 1280, "fps": 30, "audio": false,
+                    "segments": [["white", null], ["magenta", null]]}
+}
