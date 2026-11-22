@@ -19,3 +19,4 @@ training/output/
 *.log
 build/
 *.egg-info/
+.hermes/
