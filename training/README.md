@@ -125,52 +125,78 @@ above) and were fixed in the generator before the final file was
 written. Check script: `training/check_sample.py` (samples tool
 examples only; clarify and general involve no ffmpeg).
 
-## LoRA config
+## Current pilot and runbook
 
-`training/lora_config.yaml` — r 16, alpha 32, lr 1e-4, epochs 2,
-max_seq_len 1024, general_mix 0.12, thinking off. Training runs on
-Ivy's local GPU, not on the CPU-only VM where this dataset was built.
-Framework: plain transformers Trainer + PEFT (`training/train_lora.py`,
-no TRL) — completion-only loss, tokenizer's own chat template.
+`train_v1.jsonl` and the counts above are historical. The trainer now defaults to
+`train_pilot_v1.jsonl`. Build it with `python -m training.build_pilot`; metadata
+records the one-based source row. The pilot contains 2,319 JSON-only examples.
+It drops plain-text Q&A, hidden-fixture tasks, subsecond mm:ss labels, and
+ambiguous three-copy prompts. Unspecified conversion CRF is 23; any resulting
+reserved combo is discarded. Keep contrast pairs where the wording distinguishes
+keeping a range from removing it.
 
-## Train on the local GPU (runbook for Ivy's machine)
+### CPU gate (no model weights loaded)
 
-This repo was built on a CPU-only VM, so training was never run here.
-On the GPU machine, from the repo root:
-
-```bash
-pip install -r training/requirements-gpu.txt
-# torch: install the CUDA build matching the machine, e.g.
-#   pip install torch --index-url https://download.pytorch.org/whl/cu121
-python -m training.train_lora --data training/train_v1.jsonl --out training/output/lora_v1
-```
-
-The script refuses to run without CUDA, trains on the assistant
-completion only (prompt tokens masked), and saves the adapter +
-tokenizer to `training/output/lora_v1`. Expect roughly: 3000 short
-examples x 2 epochs, batch 8 x grad-accum 2 — a few tens of minutes
-on a mid-range GPU; lower `--batch` if VRAM is tight (the base model
-is 2B params in bf16, ~4 GB, plus LoRA + optimizer + activations).
-
-Then convert the adapter to GGUF and eval it against the frozen
-baseline (baseline_v3: 95.5% verification, the number to beat):
+From the repo root, with the cached HF snapshot and Transformers available:
 
 ```bash
-python llama.cpp/convert_lora_to_gguf.py --base models/MiniCPM5-2B-F16.gguf \
-    --out training/output/lora_v1.gguf training/output/lora_v1
-llama-server -m models/MiniCPM5-2B-F16.gguf --lora training/output/lora_v1.gguf \
-    --jinja -c 8192 --port 8080
-python -m eval.run_eval --all --backend http --label lora_v1 --out eval/results
+BASE="$HOME/.cache/huggingface/hub/models--openbmb--MiniCPM5-2B/snapshots/42433e90dad95123ab87729fd7011e7110629556"
+CUDA_VISIBLE_DEVICES='' python -m training.train_lora --base "$BASE" --preflight
+python -m unittest discover -s tests -v
+python -m eval.run_eval --all --backend oracle --out "$(mktemp -d)"
 ```
 
-Acceptance (guide §8.3): verification on unseen paraphrase + unseen
-combo beats baseline_v3, no regression on seen, 8/8 wrapper tests
-still pass. Ship only then. If it does not beat baseline, inspect
-failures first — the usual suspects are dataset label errors, a
-template mismatch between train and inference, or too few contrast
-pairs. Change one thing per run and record it. Adapter weights are
-gitignored; commit the adapter config, the conversion command, and
-the `lora_v1` eval results — not the weights.
+Preflight checks every row against the deployed no-thinking prefix with the
+shared few-shot messages. Only JSON and `<|im_end|>` are supervised. Mismatched
+prefixes and overlong rows fail instead of clipping. This checks the HF
+rendering, not yet GGUF server rendering.
+
+### GPU smoke (only once the GPU is available and authorized)
+
+Install the matching CUDA PyTorch build and `training/requirements-gpu.txt` in a
+separate env. Record `pip freeze`, the selected device, model and GGUF hashes, and
+llama.cpp commit. Expose exactly the confirmed BF16 device before running:
+
+```bash
+python -m training.train_lora --base "$BASE" --max-steps 3 --batch 1 --grad-accum 1 \
+    --out training/output/smoke_v1
+python "$LLAMA_CPP/convert_lora_to_gguf.py" --base "$BASE" \
+    --outfile training/output/smoke_v1.gguf training/output/smoke_v1
+```
+
+The converter's `--base` is the HF config directory, not the GGUF. The trainer
+requires finite loss and a changed LoRA B weight in the bounded run. The smoke
+adapter is not a quality candidate. Check its load and a known request using the
+exact matching stock GGUF, loopback `llama-server`, and `--jinja`. Confirm rendered
+prompt parity before the pilot. Use the same server build, flags, base GGUF,
+few-shot context, and grammar for stock vs. tuned; the only serving difference
+is `--lora path/to/adapter.gguf`. Save each run under a new label with
+`python -m eval.run_eval --all --backend http --label <label> --out eval/results`.
+
+The initial recipe remains rank 16, alpha 32, learning rate 1e-4 and at most two
+epochs; pick microbatch from measured headroom. The historical 95.5% legacy
+wrapper score is not the acceptance gate. See [the pre-GPU plan](../docs/pre-gpu-plan.md)
+for the matched development comparison and independent release gate.
+
+### Repeat a bounded development pilot
+
+With `BASE` as above, `LLAMA_CPP` pointing at the checked-out llama.cpp,
+`GGUF` the matching Q4_K_M base, and `GPU_UUID` the intended RTX 3090 UUID:
+
+```bash
+systemd-run --user --scope -p MemoryMax=16G -p MemorySwapMax=1G \
+  python -m training.factory pilot --run training/output/pilot-new \
+  --base "$BASE" --gguf "$GGUF" --llama "$LLAMA_CPP" --gpu "$GPU_UUID"
+python -m training.factory board --run training/output/pilot-new
+```
+
+The factory locks the selected GPU against other factory runs in this checkout,
+trains for up to 100 steps or 15 minutes, checks the completion manifest, and
+converts step 25 and the final adapter. A timeout preserves saved artifacts but
+does not score a partial run as a completed pilot. The matched development
+comparison uses the same base and server for stock and final; the early adapter
+only runs the fixed training-corpus probe. `board` checks the saved 200-case
+rosters and paired totals without touching CUDA. The release set is not used.
 
 ## Tests
 

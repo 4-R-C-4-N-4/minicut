@@ -1,25 +1,17 @@
-# MiniCut LoRA training config — starting point from the guide §8.1.
-# Training runs on Ivy's local GPU (NOT on the CPU-only VM where the
-# dataset was built). Framework: pick one official MiniCPM5 cookbook
-# (TRL+PEFT, LLaMA-Factory, ms-swift, or Unsloth), record it here, and
-# use it for every run in v1 so runs are comparable. Convert the
-# resulting adapter to GGUF for llama.cpp inference and record the
-# conversion command in training/README.md.
-base: openbmb/MiniCPM5-2B        # final RL+OPD checkpoint
+# Reference recipe; train_lora.py takes CLI flags, not this file.
+base: openbmb/MiniCPM5-2B
+revision: 42433e90dad95123ab87729fd7011e7110629556
 method: LoRA
-r: 16                             # sweep 16, 32 if eval says so
-alpha: 32                         # 2x r
-lr: 0.0001                        # sweep 1e-4, 2e-4
-epochs: 2                         # sweep 2, 3
-batch: as fits VRAM; record it
-max_seq_len: 1024                 # prompts are short; don't waste context
-general_mix: 0.12                 # 360/3000 general examples in train_v1
-thinking: off                     # chat_template_kwargs enable_thinking=false
-dataset: training/train_v1.jsonl
-dataset_seed: 20261121
+r: 16
+alpha: 32
+lr: 0.0001
+epochs: 2
+batch: 8  # choose the pilot microbatch from measured VRAM
+grad_accum: 2
+max_seq_len: 1024
+thinking: "off"
+general_mix: 0
+seed: 42
+dataset: training/train_pilot_v1.jsonl
 sample_check_seed: 20261122
-framework: transformers Trainer + PEFT  # plain, no TRL; see training/train_lora.py
-hardware: local GPU (Ivy's machine)
-train_script: python -m training.train_lora --data training/train_v1.jsonl --out training/output/lora_v1
-convert: python llama.cpp/convert_lora_to_gguf.py --base models/MiniCPM5-2B-F16.gguf --out training/output/lora_v1.gguf training/output/lora_v1
-eval_after_train: python -m eval.run_eval --all --backend http --label lora_v1 --out eval/results  # with llama-server --lora training/output/lora_v1.gguf
+framework: transformers Trainer + PEFT
