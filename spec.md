@@ -120,6 +120,12 @@ Ambiguity handling is a first-class output, not a failure:
 - "cut the first 10 seconds" vs "trim to 10 seconds" are different
   tools (`cut_out` 0–10 vs `trim` 0–10) — dataset must contrast these.
 
+The GBNF grammar (`minicut/grammar/minicut.gbnf`) is generated from
+`config/tools.yaml` by `minicut/grammar/generate_grammar.py` — it pins
+the field names per tool, so the model cannot emit a wrong field name.
+Ranges and probe-dependent checks live in `validate.py`; the meaning
+of each tool is pinned in `formal/dafny/minicut.dfy`.
+
 ## 6. Wrapper
 
 Responsibilities, in order:

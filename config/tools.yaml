@@ -1,6 +1,10 @@
 # MiniCut v1 — tool registry (8 tools + clarify)
 # This is the source of truth for the grammar, validator, and builder.
-# Keep in sync with minicut/grammar/minicut.gbnf and spec.md §5.
+# minicut/grammar/minicut.gbnf is GENERATED from this file by
+# minicut/grammar/generate_grammar.py (run it after changing this file;
+# tests/test_grammar.py fails if the committed grammar differs).
+# formal/dafny/minicut.dfy models the same tools; keep the arg names
+# in sync with spec.md §5.
 version: 1
 tools:
   trim:
@@ -19,7 +23,7 @@ tools:
     description: Join inputs in order.
     required: [inputs]
     args:
-      inputs: {type: list[str], min_items: 2}
+      inputs: {type: "list[str]", min_items: 2}
   scale:
     description: Resize to width x height.
     required: [input, width, height]
@@ -52,7 +56,7 @@ tools:
     required: [question]
     args:
       question: {type: str}
-      missing: {type: list[str], default: []}
+      missing: {type: "list[str]", default: []}
 output:
   default_derivation: "<stem>_<tool>.<ext>"
   sandbox: outputs only under the workdir; no absolute paths, no ".."

@@ -1,13 +1,28 @@
-# MiniCut v1 GBNF grammar — llama.cpp
+# MiniCut v1 GBNF grammar -- llama.cpp
+# GENERATED from config/tools.yaml by minicut/grammar/generate_grammar.py.
+# Do not edit by hand: run `python minicut/grammar/generate_grammar.py`.
 # Enforces: exactly one JSON object, tool from the v1 enum (+ clarify),
-# typed values only. Per-tool arg validation lives in minicut/validate.py,
-# which has the ffprobe context the grammar cannot see.
-# Keep the tool enum in sync with config/tools.yaml.
-root ::= "{" ws "\"tool\"" ws ":" ws tool ws ("," ws string ws ":" ws value)* ws "}"
-tool ::= "\"trim\"" | "\"cut_out\"" | "\"concat\"" | "\"scale\"" | "\"speed\"" | "\"convert\"" | "\"extract_audio\"" | "\"mute\"" | "\"clarify\""
+# and, per tool, exactly the field names in tools.yaml, in canonical
+# order, with the right JSON types and enum values. Required fields are
+# required; `output`, `crf` and `missing` are optional (defaults in
+# tools.yaml). Numeric ranges, start < end, even dims and the ffprobe
+# checks live in minicut/validate.py, which has the context the grammar
+# cannot see. The meaning of each tool is pinned in
+# formal/dafny/minicut.dfy; the three agree by construction (see
+# tests/test_grammar.py) and by test (tests/test_formal_dafny.py).
+root ::= trim-call | cut-out-call | concat-call | scale-call | speed-call | convert-call | extract-audio-call | mute-call | clarify-call
+trim-call ::= "{" ws "\"tool\"" ws ":" ws "\"trim\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"start\"" ws ":" ws number ws "," ws "\"end\"" ws ":" ws number (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+cut-out-call ::= "{" ws "\"tool\"" ws ":" ws "\"cut_out\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"start\"" ws ":" ws number ws "," ws "\"end\"" ws ":" ws number (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+concat-call ::= "{" ws "\"tool\"" ws ":" ws "\"concat\"" ws "," ws "\"inputs\"" ws ":" ws str-list-2 (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+scale-call ::= "{" ws "\"tool\"" ws ":" ws "\"scale\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"width\"" ws ":" ws int ws "," ws "\"height\"" ws ":" ws int (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+speed-call ::= "{" ws "\"tool\"" ws ":" ws "\"speed\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"factor\"" ws ":" ws number (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+convert-call ::= "{" ws "\"tool\"" ws ":" ws "\"convert\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"codec\"" ws ":" ws ("\"libx264\"" | "\"libx265\"" | "\"vp9\"") ws "," ws "\"container\"" ws ":" ws ("\"mp4\"" | "\"mkv\"" | "\"webm\"") (ws "," ws "\"crf\"" ws ":" ws int)? (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+extract-audio-call ::= "{" ws "\"tool\"" ws ":" ws "\"extract_audio\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"format\"" ws ":" ws ("\"mp3\"" | "\"wav\"" | "\"aac\"") (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+mute-call ::= "{" ws "\"tool\"" ws ":" ws "\"mute\"" ws "," ws "\"input\"" ws ":" ws string (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+clarify-call ::= "{" ws "\"tool\"" ws ":" ws "\"clarify\"" ws "," ws "\"question\"" ws ":" ws string (ws "," ws "\"missing\"" ws ":" ws str-list)? ws "}"
 string ::= "\"" ([^"\\] | "\\" .)* "\""
 number ::= "-"? [0-9]+ ("." [0-9]+)?
-value ::= string | number | "true" | "false" | "null" | array | object
-array ::= "[" ws (value (ws "," ws value)*)? ws "]"
-object ::= "{" ws (string ws ":" ws value (ws "," ws value)*)? ws "}"
+int ::= [0-9]+
+str-list ::= "[" ws (string (ws "," ws string)*)? ws "]"
+str-list-2 ::= "[" ws string ws "," ws string (ws "," ws string)* ws "]"
 ws ::= [ \t\n]*
