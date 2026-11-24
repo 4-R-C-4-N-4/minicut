@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import tempfile
 import re
 import os
 import subprocess
@@ -233,7 +234,8 @@ def main():
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--base", help="cached HF snapshot dir for --preflight")
     parser.add_argument("--minicut-bin")
-    parser.add_argument("--tmpdir", type=Path, default=Path.cwd() / "accept_dataset_tmp")
+    parser.add_argument("--tmpdir", type=Path,
+                        help="scratch dir for grammar checks (default: a temporary dir, removed after)")
     args = parser.parse_args()
 
     cases = _rows_and_meta(args.rows, args.meta)
@@ -246,7 +248,11 @@ def main():
     results.append(("PASS" if ok else "FAIL", "validator", detail))
 
     if args.gbnf_validator and args.grammar:
-        ok, detail = check_grammar(cases, args.gbnf_validator, args.grammar, args.tmpdir)
+        if args.tmpdir:
+            ok, detail = check_grammar(cases, args.gbnf_validator, args.grammar, args.tmpdir)
+        else:
+            with tempfile.TemporaryDirectory(prefix="accept-grammar-") as td:
+                ok, detail = check_grammar(cases, args.gbnf_validator, args.grammar, Path(td))
         results.append(("PASS" if ok else "FAIL", "grammar", detail))
     else:
         results.append(("SKIP", "grammar", "no --gbnf-validator/--grammar given"))
