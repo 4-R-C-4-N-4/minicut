@@ -586,4 +586,52 @@ mod tests {
         assert_eq!(missing(Kind::Trim, 0b1), 0b110);
         assert_eq!(missing(Kind::Convert, 0b1), 0b0110000000);
     }
+
+    #[test]
+    fn data_gen_entry_points() {
+        let c = Clip {
+            duration_ms: 30000,
+            width: Some(1280),
+            height: Some(720),
+            has_audio: true,
+        };
+        assert_eq!(
+            try_label(Intent::RemoveLast { ms: 5000 }, c),
+            Some(Edit::CutOut {
+                start_ms: 25000,
+                end_ms: 30000
+            })
+        );
+        assert_eq!(try_label(Intent::KeepLast { ms: 40000 }, c), None);
+        assert_eq!(try_label(Intent::KeepFirst { ms: 30000 }, c), None); // whole clip: no-op
+        assert_eq!(pct_of(30000, 25), Some(7500));
+        assert_eq!(pct_of(10010, 25), None);
+        assert_eq!(scale_half(1280, 720), Some((640, 360)));
+        assert_eq!(scale_quarter(1280, 720), Some((320, 180)));
+        assert_eq!(scale_quarter(720, 1280), Some((180, 320)));
+        assert_eq!(scale_half(1918, 1080), None);
+        assert_eq!(speed_percent_faster(25), Some(1250));
+        assert_eq!(speed_at_percent(80), Some(800));
+        assert_eq!(to_secs(12500), (12, 500));
+        assert_eq!(
+            kept_intervals(
+                Edit::CutOut {
+                    start_ms: 0,
+                    end_ms: 5000
+                },
+                c
+            ),
+            Some((None, Some((5000, 30000))))
+        );
+        assert_eq!(
+            flip(Intent::KeepFirst { ms: 7500 }),
+            Intent::RemoveFirst { ms: 7500 }
+        );
+        assert_eq!(
+            flip(flip(Intent::KeepLast { ms: 5000 })),
+            Intent::KeepLast { ms: 5000 }
+        );
+        assert_eq!(try_atempo(4000), Some((2000, Some(2000))));
+        assert_eq!(try_atempo(4001), None);
+    }
 }
