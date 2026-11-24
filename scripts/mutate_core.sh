@@ -6,7 +6,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERUS="$(ls -d "$ROOT"/.verus/*/verus-x86-linux | tail -1)/verus"
 SRC="$ROOT/crates/minicut-core/src/lib.rs"
-WORK="$(mktemp -d -p "${TMPDIR:-$ROOT/target}")"
+WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 survived=0
 
