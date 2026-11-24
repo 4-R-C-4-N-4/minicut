@@ -441,6 +441,28 @@ pub fn scale_quarter(w: u32, h: u32) -> (r: Option<(u32, u32)>)
     }
 }
 
+// "25% faster" -> 1.25x and "at 80% speed" -> 0.8x, in exact per-mille.
+// None when the result would fall outside the validator's 0.25x..4x.
+pub fn speed_percent_faster(p: u64) -> (r: Option<u64>)
+    ensures
+        match r {
+            Some(f) => f == 1000 + 10 * p && 1000 < f <= 4000,
+            None => p == 0 || p > 300,
+        },
+{
+    if p == 0 || p > 300 { None } else { Some(1000 + 10 * p) }
+}
+
+pub fn speed_at_percent(p: u64) -> (r: Option<u64>)
+    ensures
+        match r {
+            Some(f) => f == 10 * p && 250 <= f <= 4000,
+            None => p < 25 || p > 400,
+        },
+{
+    if p < 25 || p > 400 { None } else { Some(10 * p) }
+}
+
 } // verus!
 
 #[cfg(test)]
