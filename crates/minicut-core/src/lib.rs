@@ -471,6 +471,46 @@ pub fn to_secs(ms: u64) -> (r: (u64, u64))
     (ms / 1000, ms % 1000)
 }
 
+// Kept source intervals [a, b) of a single-input edit, as data a grader can
+// compare against: at most two pieces, proved equal to `survives` point-wise.
+pub open spec fn in_piece(p: Option<(u64, u64)>, t: int) -> bool {
+    match p {
+        Some((a, b)) => a <= t && t < b,
+        None => false,
+    }
+}
+
+pub open spec fn piece_ok(p: Option<(u64, u64)>, c: Clip) -> bool {
+    match p {
+        Some((a, b)) => a < b && b <= c.duration_ms,
+        None => true,
+    }
+}
+
+pub fn kept_intervals(e: Edit, c: Clip) -> (r: Option<(Option<(u64, u64)>, Option<(u64, u64)>)>)
+    ensures
+        match r {
+            Some(p) => accepted(e, c) && piece_ok(p.0, c) && piece_ok(p.1, c)
+                && forall|t: int| 0 <= t < c.duration_ms ==>
+                    (#[trigger] survives(e, t) <==> (in_piece(p.0, t) || in_piece(p.1, t))),
+            None => !accepted(e, c),
+        },
+{
+    if !validate(e, c) {
+        return None;
+    }
+    let p = match e {
+        Edit::Trim { start_ms, end_ms } => (Some((start_ms, end_ms)), None),
+        Edit::CutOut { start_ms, end_ms } => {
+            let a = if start_ms > 0 { Some((0u64, start_ms)) } else { None };
+            let b = if end_ms < c.duration_ms { Some((end_ms, c.duration_ms)) } else { None };
+            (a, b)
+        }
+        _ => if c.duration_ms > 0 { (Some((0u64, c.duration_ms)), None) } else { (None, None) },
+    };
+    Some(p)
+}
+
 } // verus!
 
 #[cfg(test)]
