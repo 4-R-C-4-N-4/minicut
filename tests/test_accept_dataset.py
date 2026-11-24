@@ -138,3 +138,35 @@ def test_release_check_detects_mismatch(tmp_path, monkeypatch):
     monkeypatch.setattr(accept_dataset, "_read_jsonl", broken_read)
     ok, detail = accept_dataset.check_release(str(fake))
     assert not ok
+
+
+def _filters(tmp_path, rows):
+    rows_path, meta_path = _write_rows_meta(tmp_path, rows)
+    return accept_dataset.check_pilot_filters(accept_dataset._rows_and_meta(rows_path, meta_path))
+
+
+def test_clock_fraction_is_exempt_only_when_prompt_round_trips(tmp_path):
+    # v1 dropped mm:ss rows with fractions because its renderer truncated them.
+    good = [("trim recording.mp4 from 0:03.5 to 0:07",
+             {"tool": "trim", "input": "recording.mp4", "start": 3.5, "end": 7.0},
+             _meta(template_id="trim_t2", tool="trim"))]
+    ok, detail = _filters(tmp_path, good)
+    assert ok, detail
+    assert "clock_text_round_trips" in detail
+    truncated = [("trim recording.mp4 from 0:03 to 0:07",
+                  {"tool": "trim", "input": "recording.mp4", "start": 3.5, "end": 7.0},
+                  _meta(template_id="trim_t2", tool="trim"))]
+    ok, detail = _filters(tmp_path, truncated)
+    assert not ok, detail
+
+
+def test_named_size_is_exempt_only_for_its_exact_dims(tmp_path):
+    good = [("make b.mp4 540p", {"tool": "scale", "input": "b.mp4", "width": 960, "height": 540},
+             _meta(template_id="train_scale_x2", tool="scale"))]
+    ok, detail = _filters(tmp_path, good)
+    assert ok, detail
+    assert "named_size" in detail
+    wrong = [("make b.mp4 540p", {"tool": "scale", "input": "b.mp4", "width": 540, "height": 960},
+              _meta(template_id="train_scale_x2", tool="scale"))]
+    ok, detail = _filters(tmp_path, wrong)
+    assert not ok, detail

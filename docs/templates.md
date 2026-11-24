@@ -74,6 +74,9 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 | `train_extract_x5` | Extract | NoTime | Mp3 | text | make an mp3 from {file} | names mp3 |
 | `train_extract_x6` | Extract | NoTime | Mp3 | text | pull the mp3 from {file} | names mp3 |
 | `train_extract_x8` | Extract | NoTime | Mp3 | text | isolate the audio in {file} as mp3 | names mp3 |
+| `train_extract_x7` | Extract | NoTime | Mp3 | text | audio only from {file} as mp3 | names mp3; v1 trained on it |
+| `train_extract_x9` | Extract | NoTime | Mp3 | text | grab the audio from {file} in mp3 | names mp3 |
+| `train_extract_x10` | Extract | NoTime | Mp3 | text | turn {file} into an mp3 | an mp3 from a video is its audio |
 | `mute_t1` | Mute | NoTime | Always | text | mute {file} | canonical Mute phrasing |
 | `mute_t2` | Mute | NoTime | Always | text | remove the audio from {file} |  |
 | `mute_t3` | Mute | NoTime | Always | text | make a silent version of {file} |  |
@@ -85,6 +88,8 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 | `train_mute_x5` | Mute | NoTime | Always | text | drop the sound from {file} |  |
 | `train_mute_x7` | Mute | NoTime | Always | text | strip the audio track from {file} |  |
 | `train_mute_x8` | Mute | NoTime | Always | text | remove the audio track from {file} |  |
+| `train_mute_x9` | Mute | NoTime | Always | text | kill the audio in {file} |  |
+| `train_mute_x10` | Mute | NoTime | Always | text | drop all audio from {file} |  |
 | `concat_t1` | Concat | NoTime | TwoInputs | text | join {file} to itself |  |
 | `concat_t1` | Concat | NoTime | ThreeInputs | text | join {file} to itself three times |  |
 | `concat_t2` | Concat | NoTime | TwoInputs | text | make one video from {file} twice |  |
@@ -130,7 +135,6 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 |---|---|---|
 | `concat_t4` | combine {file} with itself into one file | word-for-word the held-out template concat_h3: training on it leaks held-out wording |
 | `train_extract_x4` | export the soundtrack as mp3 | names no file; the app binds files, but the request text alone cannot say which |
-| `train_extract_x7` | audio only from {file} as mp3 | a fragment that could also mean mute-the-video; not worth the risk |
 | `speed_t3` | speed {file} up to {f}x | v1 used it for factors below 1 ('speed up to 0.8x'), which contradicts itself |
 
 ## Clarify requests: arguments missing (missing list computed by the verified core)

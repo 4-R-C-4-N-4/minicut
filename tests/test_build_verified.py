@@ -98,3 +98,47 @@ def test_stats_counts(tmp_path):
     assert stats["input"] == 2
     assert stats["kept"] == 1
     assert stats["kept_by_tool"] == {"trim": 1}
+
+
+def test_combo_arg_pool_dropped(tmp_path):
+    # eval/freeze.json rule: "Combo arg pools must never be used in training data."
+    rows_meta = [
+        (_row("speed up train.mp4 by 1.5x", {"tool": "speed", "input": "train.mp4", "factor": 1.5}),
+         _meta(template_id="v3_test", tool="speed")),
+        (_row("convert train.mp4 to mkv with libx265",
+              {"tool": "convert", "input": "train.mp4", "codec": "libx265", "container": "mkv", "crf": 18}),
+         _meta(template_id="v3_test", tool="convert")),
+        (_row("extract the audio from train.mp4 as wav",
+              {"tool": "extract_audio", "input": "train.mp4", "format": "wav"}),
+         _meta(template_id="v3_test", tool="extract_audio")),
+        (_row("keep only 8 to 22 seconds of train.mp4",
+              {"tool": "trim", "input": "train.mp4", "start": 8.0, "end": 22.0}),
+         _meta(template_id="v3_test", tool="trim")),
+        (_row("make train.mp4 854x480", {"tool": "scale", "input": "train.mp4", "width": 854, "height": 480}),
+         _meta(template_id="v3_test", tool="scale")),
+        (_row("speed up train.mp4 by 1.25x", {"tool": "speed", "input": "train.mp4", "factor": 1.25}),
+         _meta(template_id="v3_test", tool="speed")),
+    ]
+    rows_path, meta_path = _write(tmp_path, rows_meta)
+    kept_rows, kept_meta, stats = build_verified.build(rows_path, meta_path)
+    assert stats["dropped_by_reason"].get("combo_arg_pool") == 5
+    assert len(kept_rows) == 1 and "1.25" in kept_rows[0]
+
+
+def test_targets_keep_first_n_per_tool_and_fail_when_short(tmp_path):
+    rows_meta = []
+    for i in range(5):
+        rows_meta.append((_row(f"mute target{i}.mp4", {"tool": "mute", "input": f"target{i}.mp4"}),
+                          _meta(template_id="v3_test", tool="mute")))
+    for i in range(3):
+        rows_meta.append((_row(f"ask {i}", {"tool": "clarify", "question": f"q{i}", "missing": []}),
+                          _meta(template_id="v3_amb_test", tool="clarify", kind="clarify_reading", fixture=None)))
+    rows_path, meta_path = _write(tmp_path, rows_meta)
+    kept_rows, kept_meta, stats = build_verified.build(
+        rows_path, meta_path, targets={"mute": 2, "clarify_reading": 3})
+    assert [json.loads(r)["messages"][1]["content"] for r in kept_rows] == [
+        "mute target0.mp4", "mute target1.mp4", "ask 0", "ask 1", "ask 2"]
+    assert stats["dropped_by_reason"]["over_target"] == 3
+    assert stats["short_of_target"] == {}
+    _, _, stats = build_verified.build(rows_path, meta_path, targets={"mute": 9})
+    assert stats["short_of_target"] == {"mute": {"target": 9, "kept": 5}}

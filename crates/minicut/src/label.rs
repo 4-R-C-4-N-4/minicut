@@ -129,6 +129,17 @@ pub struct Counts {
 }
 
 impl Counts {
+    /// Every count scaled up by `pct` percent (headroom for the freeze gate,
+    /// which drops rows and then keeps the pilot-matched number per tool).
+    pub fn oversampled(&self, pct: usize) -> Self {
+        let up = |n: usize| n + (n * pct).div_ceil(100);
+        Counts {
+            per_tool: self.per_tool.iter().map(|(t, n)| (*t, up(*n))).collect(),
+            clarify_missing: up(self.clarify_missing),
+            clarify_reading: up(self.clarify_reading),
+        }
+    }
+
     pub fn pilot_matched() -> Self {
         Counts {
             per_tool: vec![
@@ -549,6 +560,8 @@ pub struct Generator {
     seed: u64,
     seen: BTreeSet<(String, String)>,
     pub resampled: usize,
+    /// (made, wanted) for every request that ran out of unique rows
+    pub short: Vec<(usize, usize)>,
 }
 
 impl Generator {
@@ -558,6 +571,7 @@ impl Generator {
             seed,
             seen: BTreeSet::new(),
             resampled: 0,
+            short: Vec::new(),
         }
     }
 
@@ -867,7 +881,7 @@ impl Generator {
         let prompt = req.text.replace("{file}", &file);
         let assistant = dumps(&clarify_json(&question, &missing));
         let m = meta(
-            "clarify",
+            "clarify_missing",
             "clarify",
             None,
             req.id,
@@ -976,7 +990,7 @@ impl Generator {
         // missing list is empty
         let assistant = dumps(&clarify_json(&question, &[]));
         let m = meta(
-            "clarify",
+            "clarify_reading",
             "clarify",
             Some(fx.name),
             amb.id,
@@ -998,7 +1012,12 @@ impl Generator {
             let mut tries = 0;
             while made < n {
                 tries += 1;
-                assert!(tries < 200 * n + 1000, "cannot fill {n} rows");
+                if tries > 200 * n + 1000 {
+                    // the unique (prompt, label) space is exhausted; report it
+                    // and let the gate's target check decide
+                    g.short.push((made, n));
+                    break;
+                }
                 match f(g) {
                     Some(r) => {
                         rows.push(r);

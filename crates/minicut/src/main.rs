@@ -10,7 +10,7 @@ mod wire;
 
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl | minicut meaning --call JSON --probe JSON | minicut system-prompt | minicut label --seed N --out ROWS --meta META";
+const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl | minicut meaning --call JSON --probe JSON | minicut system-prompt | minicut label --seed N --out ROWS --meta META [--oversample PCT]";
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter()
@@ -31,7 +31,12 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             };
             let mut g = label::Generator::new(seed);
-            let rows = g.run(&label::Counts::pilot_matched());
+            let over = flag(&args, "--oversample").map_or(Some(0), |s| s.parse::<usize>().ok());
+            let Some(over) = over else {
+                eprintln!("--oversample takes a percentage, e.g. 50");
+                return ExitCode::from(2);
+            };
+            let rows = g.run(&label::Counts::pilot_matched().oversampled(over));
             let lines: String = rows.iter().map(|r| r.line() + "\n").collect();
             let metas: String = rows.iter().map(|r| label::dumps(&r.meta) + "\n").collect();
             if let Err(e) = std::fs::write(out, lines).and_then(|_| std::fs::write(meta, metas)) {

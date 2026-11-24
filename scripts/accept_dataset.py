@@ -16,6 +16,8 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import re
+import os
 import subprocess
 import sys
 from collections import Counter
@@ -44,23 +46,57 @@ def _rows_and_meta(rows_path: Path, meta_path: Path):
 
 
 # --- (a) pilot_filters ------------------------------------------------------
+_CLOCK = re.compile(r"\b(\d+):(\d{2})(?:\.(\d{1,3}))?\b")
+NAMED_SIZES = {"720p": (1280, 720), "540p": (960, 540)}
+
+
+def _clock_round_trips(prompt: str, label: dict) -> bool:
+    """v1 dropped mm:ss rows with fractional labels because its renderer
+    truncated fractions. Exempt only when every clock time in the prompt
+    parses back to exactly the label's start and end."""
+    times = sorted(int(m) * 60 + int(s) + (float("0." + f) if f else 0.0)
+                   for m, s, f in _CLOCK.findall(prompt))
+    return len(times) == 2 and all(
+        abs(t - float(v)) < 1e-9 for t, v in zip(times, (label["start"], label["end"])))
+
+
+def _named_size(prompt: str, label: dict) -> bool:
+    """A named size ("540p") is in the tool's vocabulary: exempt only when the
+    label is exactly that size."""
+    return any(re.search(rf"\b{n}\b", prompt) and (label.get("width"), label.get("height")) == wh
+               for n, wh in NAMED_SIZES.items())
+
+
+# v1 heuristic -> (name of the per-row check that replaces it, check)
+EXEMPTIONS = {
+    "mmss_fraction": ("clock_text_round_trips", _clock_round_trips),
+    "scale_dims_not_in_prompt": ("named_size", _named_size),
+}
+
+
 def check_pilot_filters(cases: list[tuple], root: Path = ROOT) -> tuple[bool, str]:
     from training.build_pilot import pilot_drop_reason
 
     freeze = json.loads((root / "eval/freeze.json").read_text())
     combos = freeze["combo_arg_pools"]["convert"]
     reasons: Counter[str] = Counter()
+    exempt: Counter[str] = Counter()
     for prompt, label, meta in cases:
-        # pilot_drop_reason needs {"kind", "template_id"}; the verified
-        # meta's "kind" is "tool"/"clarify" (never "general" -- that v1
-        # bucket has no generator analogue), so only template_id-driven
-        # drops (held-out ids, train_clarify_invalid) can ever fire here.
+        # pilot_drop_reason needs {"kind", "template_id"}; the verified meta's
+        # kind is tool/clarify_*, never "general", so only template-driven and
+        # label/prompt heuristics can fire.
         pilot_meta = {"kind": meta.get("kind", "tool"), "template_id": meta.get("template_id")}
         reason = pilot_drop_reason(prompt, label, pilot_meta, combos)
-        if reason is not None:
+        if reason is None:
+            continue
+        name_check = EXEMPTIONS.get(reason)
+        if name_check and name_check[1](prompt, label):
+            exempt[name_check[0]] += 1
+        else:
             reasons[reason] += 1
     ok = not reasons
-    detail = f"{len(cases)} rows; drops by reason: {dict(sorted(reasons.items()))}"
+    detail = (f"{len(cases)} rows; drops by reason: {dict(sorted(reasons.items()))}; "
+              f"verified exemptions: {dict(sorted(exempt.items()))}")
     return ok, detail
 
 
@@ -120,12 +156,16 @@ def check_grammar(cases: list[tuple], validator: str, grammar: str, tmpdir: Path
 
 
 # --- (d) preflight -------------------------------------------------------------
-def check_preflight(rows_path: Path, root: Path = ROOT) -> tuple[bool, str]:
-    cmd = [sys.executable, "-m", "training.train_lora", "--data", str(rows_path), "--preflight"]
-    out = subprocess.run(cmd, cwd=root, capture_output=True, text=True)
+def check_preflight(rows_path: Path, base: str, root: Path = ROOT) -> tuple[bool, str]:
+    # train_lora requires --base (the cached HF snapshot); CPU only.
+    cmd = [sys.executable, "-m", "training.train_lora", "--base", base,
+           "--data", str(rows_path), "--preflight"]
+    env = {**os.environ, "CUDA_VISIBLE_DEVICES": ""}
+    out = subprocess.run(cmd, cwd=root, capture_output=True, text=True, env=env)
     ok = out.returncode == 0
-    detail = (out.stdout + out.stderr).strip().splitlines()
-    detail = detail[-1] if detail else f"exit {out.returncode}"
+    lines = (out.stdout + out.stderr).strip().splitlines()
+    summary = [ln for ln in lines if ln.startswith("preflight:")]
+    detail = summary[-1] if ok and summary else (lines[-1] if lines else f"exit {out.returncode}")
     return ok, detail
 
 
@@ -191,6 +231,7 @@ def main():
     parser.add_argument("--gbnf-validator")
     parser.add_argument("--grammar")
     parser.add_argument("--preflight", action="store_true")
+    parser.add_argument("--base", help="cached HF snapshot dir for --preflight")
     parser.add_argument("--minicut-bin")
     parser.add_argument("--tmpdir", type=Path, default=Path.cwd() / "accept_dataset_tmp")
     args = parser.parse_args()
@@ -211,7 +252,9 @@ def main():
         results.append(("SKIP", "grammar", "no --gbnf-validator/--grammar given"))
 
     if args.preflight:
-        ok, detail = check_preflight(args.rows)
+        if not args.base:
+            parser.error("--preflight needs --base (the cached HF snapshot directory)")
+        ok, detail = check_preflight(args.rows, args.base)
         results.append(("PASS" if ok else "FAIL", "preflight", detail))
     else:
         results.append(("SKIP", "preflight", "no --preflight given"))
