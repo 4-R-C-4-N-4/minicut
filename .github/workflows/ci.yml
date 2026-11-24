@@ -33,6 +33,7 @@ jobs:
       - run: cargo build
       - run: python scripts/parity_validate.py --bin target/debug/minicut --n 20000 --seed 0
       - run: python scripts/parity_validate.py --bin target/debug/minicut --n 20000 --seed 1
+      - run: python -m pytest tests/test_rust_prompts.py -q
 
   verus:
     runs-on: ubuntu-24.04
@@ -45,5 +46,6 @@ jobs:
             .verus
             ~/.rustup/toolchains/1.100.0-x86_64-unknown-linux-gnu
           key: verus-0.2026.11.22.1ce6a59
+      - run: python3 scripts/check_core_api.py
       - run: scripts/verus.sh
       - run: scripts/mutate_core.sh

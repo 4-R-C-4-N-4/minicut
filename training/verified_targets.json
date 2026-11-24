@@ -1,0 +1,13 @@
+{
+  "_comment": "Pilot-matched rows per tool (training/train_pilot_v1_meta.jsonl); clarify 310 = 250 argument-missing + 60 reading-ambiguous (plan P3-D11).",
+  "trim": 306,
+  "cut_out": 368,
+  "concat": 223,
+  "scale": 255,
+  "speed": 300,
+  "convert": 193,
+  "extract_audio": 244,
+  "mute": 120,
+  "clarify_missing": 250,
+  "clarify_reading": 60
+}

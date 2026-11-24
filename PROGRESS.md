@@ -1,6 +1,20 @@
 # MiniCut progress
 
-## Rust port, Phase 3: verified training labels (planned)
+## Rust port, Phase 3: verified training labels (implemented on `phase3-labels`; review pending; GPU experiment not run)
+
+- **Core:** the public API is total (`check_core_api.py` in CI), plus `try_label`, `pct_of`, `scale_half`/`scale_quarter`, speed percentages, `to_secs`, `kept_intervals`, `flip`/`readings_disagree`. `scripts/verus.sh` → 38 verified, 0 errors; `scripts/mutate_core.sh` → stable under seeds 0–9, 24/24 killed.
+- **Generator:** `minicut label` (intent-first rows) plus the reviewed tables in `docs/templates.md` (templates, ambiguous wording, vocabulary, clarify requests). Ambiguous requests become clarify rows that offer our phrasings (Ivy's rule, P3-D11).
+- **Dataset:** `training/train_verified_v1.jsonl` (2,319 rows, pilot-matched mix, SHA `4a787fa2…`; reproducible from debug and release builds). Freeze gate: 4,454 candidates → 2,319 (`training/train_verified_v1_stats.json`). Regenerated after the PR #5 dataset audit, which removed 6 "540p" rows (16:9 assumption, P3-D12).
+- **Acceptance (all PASS):** pilot filters 0 drops (48 per-row-verified clock exemptions); `validate.py` 2,319/2,319; llama.cpp grammar parse 2,319/2,319; tokenizer preflight (max 649, min supervised 26); release-grader meaning 16/16.
+- **Found while landing:**
+  - Labels that are correct but need hidden clip facts (last-N, percentages, relative size): excluded from tool rows (P3-D12), guarded by a one-prompt-one-target test.
+  - The freeze gate lacked the combo-pool rule; added.
+  - The acceptance preflight could never pass (missing `--base`); fixed.
+  - Reused v1 ids `concat_t4` (word-for-word held-out `concat_h3`) and `train_scale_x1` (up/down by tuple order) corrected in the table.
+- **Python tests:** 86 passed. **Rust:** 0 warnings; `cargo test` green.
+- **Next:** the GPU exit experiment. Train a matched pilot on `train_verified_v1.jsonl` and board it against stock and pilot v1 on the 200 dev cases, with the same gate.
+
+## Rust port, Phase 3: plan notes
 
 - Plan: [docs/plans/2026-11-24-rust-port-phase3.md](docs/plans/2026-11-24-rust-port-phase3.md). Meaning first: a sampled intent is rendered through a reviewed template table, and the label comes only from the proved `try_label`. A Python freeze gate drops but never edits. Rows keep the pilot format.
 - Verified core spiked (not committed): `try_label`, `pct_of`, `scale_half`/`scale_quarter`, speed percentages, `to_secs` and `kept_intervals`. 35 verified, 0 errors under 10 SMT seeds; 10/10 data-generation mutants killed; passes on stock Rust 1.99. A core rebuilt only from the plan's code blocks gives the same result.
