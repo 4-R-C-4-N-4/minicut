@@ -463,6 +463,14 @@ pub fn speed_at_percent(p: u64) -> (r: Option<u64>)
     if p < 25 || p > 400 { None } else { Some(10 * p) }
 }
 
+// Seconds text such as "12.5": whole seconds + millis, lossless. Printing
+// the digits happens outside the core; a round-trip test guards it.
+pub fn to_secs(ms: u64) -> (r: (u64, u64))
+    ensures r.0 * 1000 + r.1 == ms, r.1 < 1000,
+{
+    (ms / 1000, ms % 1000)
+}
+
 } // verus!
 
 #[cfg(test)]
