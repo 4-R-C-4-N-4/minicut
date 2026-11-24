@@ -1,12 +1,22 @@
 #[cfg_attr(not(test), allow(dead_code))] // used by the label subcommand (Task 3.17)
 mod clarify;
 mod grammar;
+mod prompts;
+// used by the label subcommand (Task 3.17)
+#[cfg_attr(not(test), allow(dead_code))]
+mod naming;
+// used by the label subcommand (Task 3.17)
+#[cfg_attr(not(test), allow(dead_code))]
+mod render;
+// used by the label subcommand (Task 3.17)
+#[cfg_attr(not(test), allow(dead_code))]
+mod rng;
 mod templates;
 mod wire;
 
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl";
+const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl | minicut meaning --call JSON --probe JSON | minicut system-prompt";
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter()
@@ -25,6 +35,54 @@ fn main() -> ExitCode {
         Some("grammar") => {
             print!("{}", grammar::gbnf());
             ExitCode::SUCCESS
+        }
+        Some("system-prompt") => {
+            print!("{}", prompts::SYSTEM_PROMPT);
+            ExitCode::SUCCESS
+        }
+        Some("meaning") => {
+            let (Some(call), Some(probe)) = (flag(&args, "--call"), flag(&args, "--probe")) else {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            };
+            let probe: wire::WireProbe = match serde_json::from_str(probe) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("bad --probe: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            let result = wire::parse(call).and_then(|c| wire::to_parsed(&c));
+            match result {
+                Ok(wire::Parsed::Edit(edit)) => {
+                    match minicut_core::kept_intervals(edit, wire::clip(&probe)) {
+                        Some((a, b)) => {
+                            let kept: Vec<[u64; 2]> =
+                                [a, b].into_iter().flatten().map(|(x, y)| [x, y]).collect();
+                            println!("{}", serde_json::json!({ "kept": kept }));
+                            ExitCode::SUCCESS
+                        }
+                        None => {
+                            println!(
+                                "{}",
+                                serde_json::json!({"ok": false, "error": "edit not accepted"})
+                            );
+                            ExitCode::from(1)
+                        }
+                    }
+                }
+                Ok(wire::Parsed::Clarify { .. }) => {
+                    println!(
+                        "{}",
+                        serde_json::json!({"ok": false, "error": "clarify has no kept intervals"})
+                    );
+                    ExitCode::from(1)
+                }
+                Err(e) => {
+                    println!("{}", serde_json::json!({"ok": false, "error": e}));
+                    ExitCode::from(1)
+                }
+            }
         }
         Some("validate") if args.iter().any(|a| a == "--batch") => {
             // JSONL on stdin: {"call": <raw call string>, "probe": {...}}.

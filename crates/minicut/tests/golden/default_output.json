@@ -1,0 +1,702 @@
+[
+  {
+    "tool": "trim",
+    "input": "clip.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_trim.mp4"
+  },
+  {
+    "tool": "trim",
+    "input": "video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "video_trim.mp4"
+  },
+  {
+    "tool": "trim",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "my_video_trim.mp4"
+  },
+  {
+    "tool": "trim",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": null,
+    "expected": "a.b_trim.mp4"
+  },
+  {
+    "tool": "trim",
+    "input": "noext",
+    "container": null,
+    "format": null,
+    "expected": "noext_trim.mp4"
+  },
+  {
+    "tool": "trim",
+    "input": ".hidden",
+    "container": null,
+    "format": null,
+    "expected": ".hidden_trim.mp4"
+  },
+  {
+    "tool": "trim",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_01_trim.mp4"
+  },
+  {
+    "tool": "trim",
+    "input": "take1.mkv",
+    "container": null,
+    "format": null,
+    "expected": "take1_trim.mkv"
+  },
+  {
+    "tool": "trim",
+    "input": "movie.webm",
+    "container": null,
+    "format": null,
+    "expected": "movie_trim.webm"
+  },
+  {
+    "tool": "cut_out",
+    "input": "clip.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_cut_out.mp4"
+  },
+  {
+    "tool": "cut_out",
+    "input": "video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "video_cut_out.mp4"
+  },
+  {
+    "tool": "cut_out",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "my_video_cut_out.mp4"
+  },
+  {
+    "tool": "cut_out",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": null,
+    "expected": "a.b_cut_out.mp4"
+  },
+  {
+    "tool": "cut_out",
+    "input": "noext",
+    "container": null,
+    "format": null,
+    "expected": "noext_cut_out.mp4"
+  },
+  {
+    "tool": "cut_out",
+    "input": ".hidden",
+    "container": null,
+    "format": null,
+    "expected": ".hidden_cut_out.mp4"
+  },
+  {
+    "tool": "cut_out",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_01_cut_out.mp4"
+  },
+  {
+    "tool": "cut_out",
+    "input": "take1.mkv",
+    "container": null,
+    "format": null,
+    "expected": "take1_cut_out.mkv"
+  },
+  {
+    "tool": "cut_out",
+    "input": "movie.webm",
+    "container": null,
+    "format": null,
+    "expected": "movie_cut_out.webm"
+  },
+  {
+    "tool": "concat",
+    "input": null,
+    "container": null,
+    "format": null,
+    "expected": "concat_output.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": "clip.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_scale.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": "video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "video_scale.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "my_video_scale.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": null,
+    "expected": "a.b_scale.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": "noext",
+    "container": null,
+    "format": null,
+    "expected": "noext_scale.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": ".hidden",
+    "container": null,
+    "format": null,
+    "expected": ".hidden_scale.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_01_scale.mp4"
+  },
+  {
+    "tool": "scale",
+    "input": "take1.mkv",
+    "container": null,
+    "format": null,
+    "expected": "take1_scale.mkv"
+  },
+  {
+    "tool": "scale",
+    "input": "movie.webm",
+    "container": null,
+    "format": null,
+    "expected": "movie_scale.webm"
+  },
+  {
+    "tool": "speed",
+    "input": "clip.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_speed.mp4"
+  },
+  {
+    "tool": "speed",
+    "input": "video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "video_speed.mp4"
+  },
+  {
+    "tool": "speed",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "my_video_speed.mp4"
+  },
+  {
+    "tool": "speed",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": null,
+    "expected": "a.b_speed.mp4"
+  },
+  {
+    "tool": "speed",
+    "input": "noext",
+    "container": null,
+    "format": null,
+    "expected": "noext_speed.mp4"
+  },
+  {
+    "tool": "speed",
+    "input": ".hidden",
+    "container": null,
+    "format": null,
+    "expected": ".hidden_speed.mp4"
+  },
+  {
+    "tool": "speed",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_01_speed.mp4"
+  },
+  {
+    "tool": "speed",
+    "input": "take1.mkv",
+    "container": null,
+    "format": null,
+    "expected": "take1_speed.mkv"
+  },
+  {
+    "tool": "speed",
+    "input": "movie.webm",
+    "container": null,
+    "format": null,
+    "expected": "movie_speed.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "clip.mp4",
+    "container": "mp4",
+    "format": null,
+    "expected": "clip_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "clip.mp4",
+    "container": "mkv",
+    "format": null,
+    "expected": "clip_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "clip.mp4",
+    "container": "webm",
+    "format": null,
+    "expected": "clip_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "video.mp4",
+    "container": "mp4",
+    "format": null,
+    "expected": "video_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "video.mp4",
+    "container": "mkv",
+    "format": null,
+    "expected": "video_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "video.mp4",
+    "container": "webm",
+    "format": null,
+    "expected": "video_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "my_video.mp4",
+    "container": "mp4",
+    "format": null,
+    "expected": "my_video_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "my_video.mp4",
+    "container": "mkv",
+    "format": null,
+    "expected": "my_video_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "my_video.mp4",
+    "container": "webm",
+    "format": null,
+    "expected": "my_video_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "a.b.mp4",
+    "container": "mp4",
+    "format": null,
+    "expected": "a.b_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "a.b.mp4",
+    "container": "mkv",
+    "format": null,
+    "expected": "a.b_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "a.b.mp4",
+    "container": "webm",
+    "format": null,
+    "expected": "a.b_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "noext",
+    "container": "mp4",
+    "format": null,
+    "expected": "noext_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "noext",
+    "container": "mkv",
+    "format": null,
+    "expected": "noext_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "noext",
+    "container": "webm",
+    "format": null,
+    "expected": "noext_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": ".hidden",
+    "container": "mp4",
+    "format": null,
+    "expected": ".hidden_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": ".hidden",
+    "container": "mkv",
+    "format": null,
+    "expected": ".hidden_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": ".hidden",
+    "container": "webm",
+    "format": null,
+    "expected": ".hidden_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "clip_01.mp4",
+    "container": "mp4",
+    "format": null,
+    "expected": "clip_01_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "clip_01.mp4",
+    "container": "mkv",
+    "format": null,
+    "expected": "clip_01_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "clip_01.mp4",
+    "container": "webm",
+    "format": null,
+    "expected": "clip_01_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "take1.mkv",
+    "container": "mp4",
+    "format": null,
+    "expected": "take1_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "take1.mkv",
+    "container": "mkv",
+    "format": null,
+    "expected": "take1_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "take1.mkv",
+    "container": "webm",
+    "format": null,
+    "expected": "take1_converted.webm"
+  },
+  {
+    "tool": "convert",
+    "input": "movie.webm",
+    "container": "mp4",
+    "format": null,
+    "expected": "movie_converted.mp4"
+  },
+  {
+    "tool": "convert",
+    "input": "movie.webm",
+    "container": "mkv",
+    "format": null,
+    "expected": "movie_converted.mkv"
+  },
+  {
+    "tool": "convert",
+    "input": "movie.webm",
+    "container": "webm",
+    "format": null,
+    "expected": "movie_converted.webm"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "clip.mp4",
+    "container": null,
+    "format": "mp3",
+    "expected": "clip.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "clip.mp4",
+    "container": null,
+    "format": "wav",
+    "expected": "clip.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "clip.mp4",
+    "container": null,
+    "format": "aac",
+    "expected": "clip.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "video.mp4",
+    "container": null,
+    "format": "mp3",
+    "expected": "video.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "video.mp4",
+    "container": null,
+    "format": "wav",
+    "expected": "video.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "video.mp4",
+    "container": null,
+    "format": "aac",
+    "expected": "video.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": "mp3",
+    "expected": "my_video.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": "wav",
+    "expected": "my_video.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": "aac",
+    "expected": "my_video.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": "mp3",
+    "expected": "a.b.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": "wav",
+    "expected": "a.b.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": "aac",
+    "expected": "a.b.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "noext",
+    "container": null,
+    "format": "mp3",
+    "expected": "noext.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "noext",
+    "container": null,
+    "format": "wav",
+    "expected": "noext.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "noext",
+    "container": null,
+    "format": "aac",
+    "expected": "noext.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": ".hidden",
+    "container": null,
+    "format": "mp3",
+    "expected": ".hidden.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": ".hidden",
+    "container": null,
+    "format": "wav",
+    "expected": ".hidden.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": ".hidden",
+    "container": null,
+    "format": "aac",
+    "expected": ".hidden.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": "mp3",
+    "expected": "clip_01.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": "wav",
+    "expected": "clip_01.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": "aac",
+    "expected": "clip_01.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "take1.mkv",
+    "container": null,
+    "format": "mp3",
+    "expected": "take1.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "take1.mkv",
+    "container": null,
+    "format": "wav",
+    "expected": "take1.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "take1.mkv",
+    "container": null,
+    "format": "aac",
+    "expected": "take1.m4a"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "movie.webm",
+    "container": null,
+    "format": "mp3",
+    "expected": "movie.mp3"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "movie.webm",
+    "container": null,
+    "format": "wav",
+    "expected": "movie.wav"
+  },
+  {
+    "tool": "extract_audio",
+    "input": "movie.webm",
+    "container": null,
+    "format": "aac",
+    "expected": "movie.m4a"
+  },
+  {
+    "tool": "mute",
+    "input": "clip.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_mute.mp4"
+  },
+  {
+    "tool": "mute",
+    "input": "video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "video_mute.mp4"
+  },
+  {
+    "tool": "mute",
+    "input": "my_video.mp4",
+    "container": null,
+    "format": null,
+    "expected": "my_video_mute.mp4"
+  },
+  {
+    "tool": "mute",
+    "input": "a.b.mp4",
+    "container": null,
+    "format": null,
+    "expected": "a.b_mute.mp4"
+  },
+  {
+    "tool": "mute",
+    "input": "noext",
+    "container": null,
+    "format": null,
+    "expected": "noext_mute.mp4"
+  },
+  {
+    "tool": "mute",
+    "input": ".hidden",
+    "container": null,
+    "format": null,
+    "expected": ".hidden_mute.mp4"
+  },
+  {
+    "tool": "mute",
+    "input": "clip_01.mp4",
+    "container": null,
+    "format": null,
+    "expected": "clip_01_mute.mp4"
+  },
+  {
+    "tool": "mute",
+    "input": "take1.mkv",
+    "container": null,
+    "format": null,
+    "expected": "take1_mute.mkv"
+  },
+  {
+    "tool": "mute",
+    "input": "movie.webm",
+    "container": null,
+    "format": null,
+    "expected": "movie_mute.webm"
+  }
+]
