@@ -107,4 +107,58 @@ pub proof fn trim_cut_partition(s: u64, e: u64, c: Clip)
 {
 }
 
+// ------------------------------------------------ intents -> labels (data) --
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Intent {
+    KeepRange { start_ms: u64, end_ms: u64 },
+    RemoveRange { start_ms: u64, end_ms: u64 },
+    KeepFirst { ms: u64 },
+    RemoveFirst { ms: u64 },
+    KeepLast { ms: u64 },
+    RemoveLast { ms: u64 },
+}
+
+/// The intended surviving duration, stated without mentioning any tool.
+pub open spec fn intent_kept(i: Intent, c: Clip) -> int {
+    match i {
+        Intent::KeepRange { start_ms, end_ms } => end_ms - start_ms,
+        Intent::RemoveRange { start_ms, end_ms } => c.duration_ms - (end_ms - start_ms),
+        Intent::KeepFirst { ms } => ms as int,
+        Intent::RemoveFirst { ms } => c.duration_ms - ms,
+        Intent::KeepLast { ms } => ms as int,
+        Intent::RemoveLast { ms } => c.duration_ms - ms,
+    }
+}
+
+/// Which tool family the request means: keep-intents are trims,
+/// remove-intents are cut_outs. This is the keep/remove contract.
+pub open spec fn is_keep(i: Intent) -> bool {
+    match i {
+        Intent::KeepRange { .. } | Intent::KeepFirst { .. } | Intent::KeepLast { .. } => true,
+        _ => false,
+    }
+}
+
+pub fn label(i: Intent, c: Clip) -> (e: Edit)
+    requires
+        match i {
+            Intent::KeepLast { ms } => ms <= c.duration_ms,
+            Intent::RemoveLast { ms } => ms <= c.duration_ms,
+            _ => true,
+        },
+    ensures
+        kept_ms(e, c) == intent_kept(i, c),
+        is_keep(i) <==> (e is Trim),
+        !is_keep(i) <==> (e is CutOut),
+{
+    match i {
+        Intent::KeepRange { start_ms, end_ms } => Edit::Trim { start_ms, end_ms },
+        Intent::RemoveRange { start_ms, end_ms } => Edit::CutOut { start_ms, end_ms },
+        Intent::KeepFirst { ms } => Edit::Trim { start_ms: 0, end_ms: ms },
+        Intent::RemoveFirst { ms } => Edit::CutOut { start_ms: 0, end_ms: ms },
+        Intent::KeepLast { ms } => Edit::Trim { start_ms: c.duration_ms - ms, end_ms: c.duration_ms },
+        Intent::RemoveLast { ms } => Edit::CutOut { start_ms: c.duration_ms - ms, end_ms: c.duration_ms },
+    }
+}
+
 } // verus!
