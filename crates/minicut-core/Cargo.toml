@@ -1,0 +1,10 @@
+[package]
+name = "minicut-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vstd = { workspace = true }
+
+[package.metadata.verus]
+verify = true
