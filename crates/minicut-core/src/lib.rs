@@ -511,6 +511,44 @@ pub fn kept_intervals(e: Edit, c: Clip) -> (r: Option<(Option<(u64, u64)>, Optio
     Some(p)
 }
 
+// ------------------------------------------- ambiguity: the other reading ----
+// "trim the first 25%" can mean keep-first or remove-first. `flip` gives the
+// other reading of the same span; `readings_disagree` proves the two readings
+// disagree at *every* instant of *every* clip, so a guess is entirely wrong
+// under one of them. That is why ambiguous wording becomes a clarify that
+// offers both readings (as canonical phrasings), never a guessed label.
+pub open spec fn flip_spec(i: Intent) -> Intent {
+    match i {
+        Intent::KeepRange { start_ms, end_ms } => Intent::RemoveRange { start_ms, end_ms },
+        Intent::RemoveRange { start_ms, end_ms } => Intent::KeepRange { start_ms, end_ms },
+        Intent::KeepFirst { ms } => Intent::RemoveFirst { ms },
+        Intent::RemoveFirst { ms } => Intent::KeepFirst { ms },
+        Intent::KeepLast { ms } => Intent::RemoveLast { ms },
+        Intent::RemoveLast { ms } => Intent::KeepLast { ms },
+    }
+}
+
+pub fn flip(i: Intent) -> (o: Intent)
+    ensures
+        o == flip_spec(i),
+        is_keep(i) != is_keep(o),
+{
+    match i {
+        Intent::KeepRange { start_ms, end_ms } => Intent::RemoveRange { start_ms, end_ms },
+        Intent::RemoveRange { start_ms, end_ms } => Intent::KeepRange { start_ms, end_ms },
+        Intent::KeepFirst { ms } => Intent::RemoveFirst { ms },
+        Intent::RemoveFirst { ms } => Intent::KeepFirst { ms },
+        Intent::KeepLast { ms } => Intent::RemoveLast { ms },
+        Intent::RemoveLast { ms } => Intent::KeepLast { ms },
+    }
+}
+
+pub proof fn readings_disagree(i: Intent, c: Clip)
+    ensures
+        forall|t: int| #[trigger] intent_survives(i, c, t) == !intent_survives(flip_spec(i), c, t),
+{
+}
+
 } // verus!
 
 #[cfg(test)]
