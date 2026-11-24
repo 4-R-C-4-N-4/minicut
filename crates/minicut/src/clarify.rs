@@ -264,6 +264,26 @@ pub fn missing_question(req: &Request, file: &str, suggestions: &[String]) -> St
     }
 }
 
+/// docs/templates.md section: each request with the tools it could mean and
+/// the missing list the verified core computes for it.
+pub fn markdown() -> String {
+    let mut s = String::from(
+        "\n## Clarify requests: arguments missing (missing list computed by the verified core)\n\n\
+         | id | request | could mean | missing | why |\n|---|---|---|---|---|\n",
+    );
+    for r in REQUESTS {
+        s += &format!(
+            "| `{}` | {} | {:?} | {:?} | {} |\n",
+            r.id,
+            r.text,
+            r.kinds,
+            missing_names(r.kinds[0], r.provided),
+            r.note
+        );
+    }
+    s
+}
+
 /// Question for reading-ambiguous wording: both readings, as our phrasings
 /// with the user's own numbers ("Do you want to keep only the first 7.5
 /// seconds of clip.mp4, or remove the first 7.5 seconds of clip.mp4?").

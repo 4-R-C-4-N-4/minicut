@@ -6,92 +6,95 @@ intent kind. Labels never come from here; they come from the verified core.
 
 ## Templates
 
-| id | kind | numbers | applies when | wording | why |
-|---|---|---|---|---|---|
-| `trim_t1` | KeepRange | Secs | Always | trim {file} from {a} seconds to {b} seconds | 'trim from a to b' names what is kept |
-| `trim_t2` | KeepRange | Clock | Always | trim {file} from {a} to {b} | v1 trim_t2 wording; clock now keeps fractions (v1 _mmss truncated them) |
-| `trim_t3` | KeepRange | Secs | Always | keep only {a} to {b} seconds of {file} | 'keep only' is unambiguous; canonical KeepRange phrasing |
-| `trim_t4` | KeepRange | Secs | Always | cut {file} down to {a}-{b} seconds | verb trap: 'cut ... down to' names what remains, so keep |
-| `trim_t5` | KeepRange | Secs | StartNonZero | trim {file} from {a} to {b} | v1 trim_t5 start>0 branch |
-| `trim_t5` | KeepFirst | Secs | StartZero | trim {file} to the first {b} seconds | 'trim to the first N' names what remains, so keep-first |
-| `train_trim_x1` | KeepRange | Secs | Always | trim {file} from {a}s to {b}s | short-unit variant of trim_t1 |
-| `train_trim_x2` | KeepRange | Secs | Always | cut {file} to {a}-{b} | verb trap: 'cut X to a-b' names the result, so keep |
-| `train_trim_x3` | KeepRange | Secs | Always | keep the {a} to {b} second part of {file} | 'keep' is unambiguous |
-| `cut_t1` | RemoveRange | Secs | StartNonZero | remove {a} to {b} seconds from {file} | v1 cut_t1 start>0 branch; 'remove' names what goes |
-| `cut_t1` | RemoveFirst | Secs | StartZero | cut the first {b} seconds off {file} | 'cut ... off' removes; canonical RemoveFirst phrasing |
-| `cut_t2` | RemoveRange | Secs | Always | remove {a} to {b} seconds from {file} | canonical RemoveRange phrasing |
-| `cut_t3` | RemoveRange | Secs | Always | cut out {a}-{b} from {file} | 'cut out' removes |
-| `cut_t4` | RemoveRange | Secs | Middle | delete the middle {a} to {b} seconds of {file} | 'the middle' is false unless 0 < a and b < duration |
-| `cut_t5` | RemoveRange | Secs | Always | drop seconds {a} through {b} of {file} | 'drop' removes |
-| `train_cut_x1` | RemoveRange | Secs | Always | take out {a} to {b} seconds from {file} | 'take out' removes |
-| `train_cut_x2` | RemoveRange | Secs | Always | delete seconds {a} through {b} from {file} | 'delete' removes |
-| `train_cut_x3` | RemoveRange | Secs | Always | cut the section from {a} to {b} seconds out of {file} | 'cut ... out of' removes |
-| `train_cut_x4` | RemoveRange | Secs | Middle | remove the middle {a} to {b} seconds from {file} | 'the middle' needs 0 < a and b < duration |
-| `v3_cut_clock` | RemoveRange | Clock | Always | remove {a} to {b} from {file} | clock-time RemoveRange; fractions kept |
-| `v3_keep_first` | KeepFirst | Secs | Always | keep only the first {b} seconds of {file} | canonical KeepFirst phrasing |
-| `v3_keep_first_pct` | KeepFirst | Pct | Always | keep only the first {pct} of {file} | 'keep only' makes the percentage unambiguous |
-| `v3_remove_first` | RemoveFirst | Secs | Always | remove the first {b} seconds of {file} | 'remove' names what goes |
-| `v3_remove_first_pct` | RemoveFirst | Pct | Always | cut the first {pct} off {file} | 'cut ... off' removes (v1 train_cut_x_pct wording) |
-| `v3_keep_last` | KeepLast | Secs | Always | keep only the last {a} seconds of {file} | canonical KeepLast phrasing ({a} is the kept length) |
-| `v3_keep_last_pct` | KeepLast | Pct | Always | keep only the last {pct} of {file} | 'keep only' makes the percentage unambiguous |
-| `v3_remove_last` | RemoveLast | Secs | Always | cut the last {a} seconds off {file} | canonical RemoveLast phrasing ({a} is the removed length) |
-| `v3_remove_last_pct` | RemoveLast | Pct | Always | cut the last {pct} off {file} | 'cut ... off' removes |
-| `scale_t1` | ScaleExact | NoTime | Always | make {file} {w}x{h} | exact size |
-| `scale_t2` | ScaleExact | NoTime | Always | resize {file} to {w} by {h} | exact size |
-| `scale_t3` | ScaleExact | NoTime | Is720p | scale {file} to 720p | 720p means 1280x720 in this tool's vocabulary |
-| `scale_t3` | ScaleExact | NoTime | Always | resize {file} to {w}x{h} | v1 scale_t3 non-720p branch |
-| `train_scale_x1` | ScaleExact | NoTime | BothSmaller | scale {file} down to {w}x{h} | v1 picked up/down by tuple order; now only when both dims shrink |
-| `train_scale_x1` | ScaleExact | NoTime | BothLarger | scale {file} up to {w}x{h} | only when both dims grow |
-| `train_scale_x2` | ScaleExact | NoTime | Is540p | make {file} 540p | 540p means 960x540 here |
-| `v3_half_size` | ScaleHalf | NoTime | Always | shrink {file} to half size | label from scale_half (exact, even) |
-| `v3_half_size_2` | ScaleHalf | NoTime | Always | make {file} half its size | label from scale_half |
-| `v3_quarter_size` | ScaleQuarter | NoTime | Always | shrink {file} to a quarter of its size | label from scale_quarter (exact, even) |
-| `v3_quarter_size_2` | ScaleQuarter | NoTime | Always | make {file} a quarter of its size | label from scale_quarter |
-| `speed_t1` | SpeedFactor | NoTime | FactorAbove1 | speed up {file} by {f}x | faster |
-| `speed_t1` | SpeedFactor | NoTime | FactorBelow1 | slow {file} down to {f}x | slower |
-| `speed_t2` | SpeedFactor | NoTime | FactorAbove1 | make {file} {f} times as fast | faster |
-| `speed_t2` | SpeedFactor | NoTime | FactorBelow1 | play {file} at {f}x speed | slower |
-| `speed_t4` | SpeedFactor | NoTime | Always | run {file} at {f}x speed | either way |
-| `train_speed_x2` | SpeedFactor | NoTime | Always | change {file} to play at {f}x | either way |
-| `train_speed_x1` | SpeedFaster | NoTime | Always | make {file} {p}% faster | label from speed_percent_faster: 1 + p/100 |
-| `v3_speed_up_pct` | SpeedFaster | NoTime | Always | speed {file} up by {p}% | label from speed_percent_faster |
-| `train_speed_x1` | SpeedAtPercent | NoTime | Always | slow {file} to {p}% speed | label from speed_at_percent: p/100 |
-| `v3_play_at_pct` | SpeedAtPercent | NoTime | Always | play {file} at {p}% speed | label from speed_at_percent |
-| `convert_t1` | Convert | NoTime | Always | convert {file} to {container} with {codec} |  |
-| `convert_t2` | Convert | NoTime | Always | re-encode {file} as {codec} in a .{container} file |  |
-| `convert_t3` | Convert | NoTime | Always | save {file} as {container} using {codec} |  |
-| `train_convert_x1` | Convert | NoTime | Always | save {file} as a .{container} file with {codec} |  |
-| `train_convert_x2` | Convert | NoTime | Always | change {file} to {container} format using {codec} |  |
-| `extract_t1` | Extract | NoTime | Always | extract the audio from {file} as {fmt} |  |
-| `extract_t2` | Extract | NoTime | Always | save the audio from {file} to {fmt} |  |
-| `extract_t3` | Extract | NoTime | Always | pull the soundtrack out of {file} as an {fmt} file |  |
-| `train_extract_x1` | Extract | NoTime | Mp3 | get the mp3 from {file} | names mp3 |
-| `train_extract_x2` | Extract | NoTime | Mp3 | rip the mp3 out of {file} | names mp3 |
-| `train_extract_x3` | Extract | NoTime | Mp3 | save {file}'s audio as mp3 | names mp3 |
-| `train_extract_x5` | Extract | NoTime | Mp3 | make an mp3 from {file} | names mp3 |
-| `train_extract_x6` | Extract | NoTime | Mp3 | pull the mp3 from {file} | names mp3 |
-| `train_extract_x8` | Extract | NoTime | Mp3 | isolate the audio in {file} as mp3 | names mp3 |
-| `mute_t1` | Mute | NoTime | Always | mute {file} | canonical Mute phrasing |
-| `mute_t2` | Mute | NoTime | Always | remove the audio from {file} |  |
-| `mute_t3` | Mute | NoTime | Always | make a silent version of {file} |  |
-| `mute_t4` | Mute | NoTime | Always | drop the audio track from {file} |  |
-| `train_mute_x1` | Mute | NoTime | Always | silence the audio in {file} |  |
-| `train_mute_x2` | Mute | NoTime | Always | make {file} silent |  |
-| `train_mute_x3` | Mute | NoTime | Always | turn off the sound in {file} |  |
-| `train_mute_x4` | Mute | NoTime | Always | remove all sound from {file} |  |
-| `train_mute_x5` | Mute | NoTime | Always | drop the sound from {file} |  |
-| `train_mute_x7` | Mute | NoTime | Always | strip the audio track from {file} |  |
-| `train_mute_x8` | Mute | NoTime | Always | remove the audio track from {file} |  |
-| `concat_t1` | Concat | NoTime | TwoInputs | join {file} to itself |  |
-| `concat_t1` | Concat | NoTime | ThreeInputs | join {file} to itself three times |  |
-| `concat_t2` | Concat | NoTime | TwoInputs | make one video from {file} twice |  |
-| `concat_t2` | Concat | NoTime | ThreeInputs | make one video from {file} three times in a row |  |
-| `concat_t3` | Concat | NoTime | TwoInputs | concatenate {file} with itself | v1 used it for 3 inputs too; 'with itself' says two, so two only |
-| `train_concat_x1` | Concat | NoTime | Always | put {n} copies of {file} together | {n} is two/three |
-| `train_concat_x2` | Concat | NoTime | TwoInputs | merge {file} with itself | 'with itself' says two |
-| `train_concat_x3` | Concat | NoTime | TwoInputs | append {file} to itself | 'to itself' says two |
-| `train_concat_x4` | Concat | NoTime | Always | loop {file} {times} | {times} is twice/three times |
-| `train_concat_x5` | Concat | NoTime | Always | make a video with {file} {times} in a row |  |
+The label column says whether the label follows from the text alone (`text`) or needs the
+clip's duration or size (`probe`). Only `text` rows are used for tool labels.
+
+| id | kind | numbers | applies when | label | wording | why |
+|---|---|---|---|---|---|---|
+| `trim_t1` | KeepRange | Secs | Always | text | trim {file} from {a} seconds to {b} seconds | 'trim from a to b' names what is kept |
+| `trim_t2` | KeepRange | Clock | Always | text | trim {file} from {a} to {b} | v1 trim_t2 wording; clock now keeps fractions (v1 _mmss truncated them) |
+| `trim_t3` | KeepRange | Secs | Always | text | keep only {a} to {b} seconds of {file} | 'keep only' is unambiguous; canonical KeepRange phrasing |
+| `trim_t4` | KeepRange | Secs | Always | text | cut {file} down to {a}-{b} seconds | verb trap: 'cut ... down to' names what remains, so keep |
+| `trim_t5` | KeepRange | Secs | StartNonZero | text | trim {file} from {a} to {b} | v1 trim_t5 start>0 branch |
+| `trim_t5` | KeepFirst | Secs | StartZero | text | trim {file} to the first {b} seconds | 'trim to the first N' names what remains, so keep-first |
+| `train_trim_x1` | KeepRange | Secs | Always | text | trim {file} from {a}s to {b}s | short-unit variant of trim_t1 |
+| `train_trim_x2` | KeepRange | Secs | Always | text | cut {file} to {a}-{b} | verb trap: 'cut X to a-b' names the result, so keep |
+| `train_trim_x3` | KeepRange | Secs | Always | text | keep the {a} to {b} second part of {file} | 'keep' is unambiguous |
+| `cut_t1` | RemoveRange | Secs | StartNonZero | text | remove {a} to {b} seconds from {file} | v1 cut_t1 start>0 branch; 'remove' names what goes |
+| `cut_t1` | RemoveFirst | Secs | StartZero | text | cut the first {b} seconds off {file} | 'cut ... off' removes; canonical RemoveFirst phrasing |
+| `cut_t2` | RemoveRange | Secs | Always | text | remove {a} to {b} seconds from {file} | canonical RemoveRange phrasing |
+| `cut_t3` | RemoveRange | Secs | Always | text | cut out {a}-{b} from {file} | 'cut out' removes |
+| `cut_t4` | RemoveRange | Secs | Middle | text | delete the middle {a} to {b} seconds of {file} | 'the middle' is false unless 0 < a and b < duration |
+| `cut_t5` | RemoveRange | Secs | Always | text | drop seconds {a} through {b} of {file} | 'drop' removes |
+| `train_cut_x1` | RemoveRange | Secs | Always | text | take out {a} to {b} seconds from {file} | 'take out' removes |
+| `train_cut_x2` | RemoveRange | Secs | Always | text | delete seconds {a} through {b} from {file} | 'delete' removes |
+| `train_cut_x3` | RemoveRange | Secs | Always | text | cut the section from {a} to {b} seconds out of {file} | 'cut ... out of' removes |
+| `train_cut_x4` | RemoveRange | Secs | Middle | text | remove the middle {a} to {b} seconds from {file} | 'the middle' needs 0 < a and b < duration |
+| `v3_cut_clock` | RemoveRange | Clock | Always | text | remove {a} to {b} from {file} | clock-time RemoveRange; fractions kept |
+| `v3_keep_first` | KeepFirst | Secs | Always | text | keep only the first {b} seconds of {file} | canonical KeepFirst phrasing |
+| `v3_keep_first_pct` | KeepFirst | Pct | Always | probe | keep only the first {pct} of {file} | 'keep only' makes the percentage unambiguous |
+| `v3_remove_first` | RemoveFirst | Secs | Always | text | remove the first {b} seconds of {file} | 'remove' names what goes |
+| `v3_remove_first_pct` | RemoveFirst | Pct | Always | probe | cut the first {pct} off {file} | 'cut ... off' removes (v1 train_cut_x_pct wording) |
+| `v3_keep_last` | KeepLast | Secs | Always | probe | keep only the last {a} seconds of {file} | canonical KeepLast phrasing ({a} is the kept length) |
+| `v3_keep_last_pct` | KeepLast | Pct | Always | probe | keep only the last {pct} of {file} | 'keep only' makes the percentage unambiguous |
+| `v3_remove_last` | RemoveLast | Secs | Always | probe | cut the last {a} seconds off {file} | canonical RemoveLast phrasing ({a} is the removed length) |
+| `v3_remove_last_pct` | RemoveLast | Pct | Always | probe | cut the last {pct} off {file} | 'cut ... off' removes |
+| `scale_t1` | ScaleExact | NoTime | Always | text | make {file} {w}x{h} | exact size |
+| `scale_t2` | ScaleExact | NoTime | Always | text | resize {file} to {w} by {h} | exact size |
+| `scale_t3` | ScaleExact | NoTime | Is720p | text | scale {file} to 720p | 720p means 1280x720 in this tool's vocabulary |
+| `scale_t3` | ScaleExact | NoTime | Always | text | resize {file} to {w}x{h} | v1 scale_t3 non-720p branch |
+| `train_scale_x1` | ScaleExact | NoTime | BothSmaller | text | scale {file} down to {w}x{h} | v1 picked up/down by tuple order; now only when both dims shrink |
+| `train_scale_x1` | ScaleExact | NoTime | BothLarger | text | scale {file} up to {w}x{h} | only when both dims grow |
+| `train_scale_x2` | ScaleExact | NoTime | Is540p | text | make {file} 540p | 540p means 960x540 here |
+| `v3_half_size` | ScaleHalf | NoTime | Always | probe | shrink {file} to half size | label from scale_half (exact, even) |
+| `v3_half_size_2` | ScaleHalf | NoTime | Always | probe | make {file} half its size | label from scale_half |
+| `v3_quarter_size` | ScaleQuarter | NoTime | Always | probe | shrink {file} to a quarter of its size | label from scale_quarter (exact, even) |
+| `v3_quarter_size_2` | ScaleQuarter | NoTime | Always | probe | make {file} a quarter of its size | label from scale_quarter |
+| `speed_t1` | SpeedFactor | NoTime | FactorAbove1 | text | speed up {file} by {f}x | faster |
+| `speed_t1` | SpeedFactor | NoTime | FactorBelow1 | text | slow {file} down to {f}x | slower |
+| `speed_t2` | SpeedFactor | NoTime | FactorAbove1 | text | make {file} {f} times as fast | faster |
+| `speed_t2` | SpeedFactor | NoTime | FactorBelow1 | text | play {file} at {f}x speed | slower |
+| `speed_t4` | SpeedFactor | NoTime | Always | text | run {file} at {f}x speed | either way |
+| `train_speed_x2` | SpeedFactor | NoTime | Always | text | change {file} to play at {f}x | either way |
+| `train_speed_x1` | SpeedFaster | NoTime | Always | text | make {file} {p}% faster | label from speed_percent_faster: 1 + p/100 |
+| `v3_speed_up_pct` | SpeedFaster | NoTime | Always | text | speed {file} up by {p}% | label from speed_percent_faster |
+| `train_speed_x1` | SpeedAtPercent | NoTime | Always | text | slow {file} to {p}% speed | label from speed_at_percent: p/100 |
+| `v3_play_at_pct` | SpeedAtPercent | NoTime | Always | text | play {file} at {p}% speed | label from speed_at_percent |
+| `convert_t1` | Convert | NoTime | Always | text | convert {file} to {container} with {codec} |  |
+| `convert_t2` | Convert | NoTime | Always | text | re-encode {file} as {codec} in a .{container} file |  |
+| `convert_t3` | Convert | NoTime | Always | text | save {file} as {container} using {codec} |  |
+| `train_convert_x1` | Convert | NoTime | Always | text | save {file} as a .{container} file with {codec} |  |
+| `train_convert_x2` | Convert | NoTime | Always | text | change {file} to {container} format using {codec} |  |
+| `extract_t1` | Extract | NoTime | Always | text | extract the audio from {file} as {fmt} |  |
+| `extract_t2` | Extract | NoTime | Always | text | save the audio from {file} to {fmt} |  |
+| `extract_t3` | Extract | NoTime | Always | text | pull the soundtrack out of {file} as an {fmt} file |  |
+| `train_extract_x1` | Extract | NoTime | Mp3 | text | get the mp3 from {file} | names mp3 |
+| `train_extract_x2` | Extract | NoTime | Mp3 | text | rip the mp3 out of {file} | names mp3 |
+| `train_extract_x3` | Extract | NoTime | Mp3 | text | save {file}'s audio as mp3 | names mp3 |
+| `train_extract_x5` | Extract | NoTime | Mp3 | text | make an mp3 from {file} | names mp3 |
+| `train_extract_x6` | Extract | NoTime | Mp3 | text | pull the mp3 from {file} | names mp3 |
+| `train_extract_x8` | Extract | NoTime | Mp3 | text | isolate the audio in {file} as mp3 | names mp3 |
+| `mute_t1` | Mute | NoTime | Always | text | mute {file} | canonical Mute phrasing |
+| `mute_t2` | Mute | NoTime | Always | text | remove the audio from {file} |  |
+| `mute_t3` | Mute | NoTime | Always | text | make a silent version of {file} |  |
+| `mute_t4` | Mute | NoTime | Always | text | drop the audio track from {file} |  |
+| `train_mute_x1` | Mute | NoTime | Always | text | silence the audio in {file} |  |
+| `train_mute_x2` | Mute | NoTime | Always | text | make {file} silent |  |
+| `train_mute_x3` | Mute | NoTime | Always | text | turn off the sound in {file} |  |
+| `train_mute_x4` | Mute | NoTime | Always | text | remove all sound from {file} |  |
+| `train_mute_x5` | Mute | NoTime | Always | text | drop the sound from {file} |  |
+| `train_mute_x7` | Mute | NoTime | Always | text | strip the audio track from {file} |  |
+| `train_mute_x8` | Mute | NoTime | Always | text | remove the audio track from {file} |  |
+| `concat_t1` | Concat | NoTime | TwoInputs | text | join {file} to itself |  |
+| `concat_t1` | Concat | NoTime | ThreeInputs | text | join {file} to itself three times |  |
+| `concat_t2` | Concat | NoTime | TwoInputs | text | make one video from {file} twice |  |
+| `concat_t2` | Concat | NoTime | ThreeInputs | text | make one video from {file} three times in a row |  |
+| `concat_t3` | Concat | NoTime | TwoInputs | text | concatenate {file} with itself | v1 used it for 3 inputs too; 'with itself' says two, so two only |
+| `train_concat_x1` | Concat | NoTime | Always | text | put {n} copies of {file} together | {n} is two/three |
+| `train_concat_x2` | Concat | NoTime | TwoInputs | text | merge {file} with itself | 'with itself' says two |
+| `train_concat_x3` | Concat | NoTime | TwoInputs | text | append {file} to itself | 'to itself' says two |
+| `train_concat_x4` | Concat | NoTime | Always | text | loop {file} {times} | {times} is twice/three times |
+| `train_concat_x5` | Concat | NoTime | Always | text | make a video with {file} {times} in a row |  |
 
 ## Ambiguous wording: always a clarify, never a label (P3-D11)
 
@@ -129,3 +132,32 @@ intent kind. Labels never come from here; they come from the verified core.
 | `train_extract_x4` | export the soundtrack as mp3 | names no file; the app binds files, but the request text alone cannot say which |
 | `train_extract_x7` | audio only from {file} as mp3 | a fragment that could also mean mute-the-video; not worth the risk |
 | `speed_t3` | speed {file} up to {f}x | v1 used it for factors below 1 ('speed up to 0.8x'), which contradicts itself |
+
+## Clarify requests: arguments missing (missing list computed by the verified core)
+
+| id | request | could mean | missing | why |
+|---|---|---|---|---|
+| `v3_clar_trim` | trim {file} | [Trim, CutOut] | ["start", "end"] | bare 'trim' is read as keep or remove (cf. 'trim the first 25%') |
+| `v3_clar_cut` | cut {file} | [Trim, CutOut] | ["start", "end"] | v1 answered with the trim question; 'cut' can mean either |
+| `v3_clar_shorten` | shorten {file} | [Trim, CutOut] | ["start", "end"] | shorter by keeping a part or by removing one |
+| `v3_clar_trim_the_clip` | trim the clip | [Trim, CutOut] | ["start", "end"] | as 'trim {file}' |
+| `v3_clar_edit_down` | edit {file} down | [Trim] | ["start", "end"] | 'edit down' keeps the essential part |
+| `v3_clar_cut_bad` | cut the bad part out of {file} | [CutOut] | ["start", "end"] | 'cut ... out' removes |
+| `v3_clar_remove_boring` | remove the boring bit from {file} | [CutOut] | ["start", "end"] | 'remove' names what goes |
+| `v3_clar_cut_something` | cut something out of {file} | [CutOut] | ["start", "end"] | 'cut ... out' removes |
+| `v3_clar_smaller` | make {file} smaller | [Scale] | ["width", "height"] | the frozen eval defines 'make it smaller' as scale |
+| `v3_clar_resize` | resize {file} | [Scale] | ["width", "height"] |  |
+| `v3_clar_size` | change the size of {file} | [Scale] | ["width", "height"] |  |
+| `v3_clar_bigger` | make {file} bigger | [Scale] | ["width", "height"] |  |
+| `v3_clar_speed_up` | speed up {file} | [Speed] | ["factor"] |  |
+| `v3_clar_slow` | slow {file} down | [Speed] | ["factor"] |  |
+| `v3_clar_speed` | change the speed of {file} | [Speed] | ["factor"] |  |
+| `v3_clar_convert` | convert {file} | [Convert] | ["codec", "container"] |  |
+| `v3_clar_format` | change the format of {file} | [Convert] | ["codec", "container"] |  |
+| `v3_clar_reencode` | re-encode {file} | [Convert] | ["codec", "container"] |  |
+| `v3_clar_audio` | get the audio from {file} | [ExtractAudio] | ["format"] |  |
+| `v3_clar_pull_audio` | pull the audio out of {file} | [ExtractAudio] | ["format"] |  |
+| `v3_clar_sound` | save the sound from {file} | [ExtractAudio] | ["format"] |  |
+| `v3_clar_join` | join the clips | [Concat] | ["inputs"] | concat takes `inputs`; none given |
+| `v3_clar_together` | put the videos together | [Concat] | ["inputs"] |  |
+| `v3_clar_combine` | combine {file} with another video | [Concat] | ["inputs"] | the other video is not named |

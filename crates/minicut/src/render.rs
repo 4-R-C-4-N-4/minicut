@@ -18,10 +18,6 @@ pub fn secs_text(ms: u64) -> String {
     format!("{s}{}", frac_text(f))
 }
 
-pub fn short_text(ms: u64) -> String {
-    format!("{}s", secs_text(ms))
-}
-
 pub fn clock_text(ms: u64) -> String {
     let (m, s, f) = minicut_core::to_clock(ms);
     format!("{m}:{s:02}{}", frac_text(f))
@@ -42,12 +38,6 @@ mod tests {
         assert_eq!(secs_text(12050), "12.05");
         assert_eq!(secs_text(12005), "12.005");
         assert_eq!(secs_text(0), "0");
-    }
-
-    #[test]
-    fn short_text_examples() {
-        assert_eq!(short_text(12000), "12s");
-        assert_eq!(short_text(12500), "12.5s");
     }
 
     #[test]

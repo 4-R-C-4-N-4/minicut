@@ -1,22 +1,16 @@
-#[cfg_attr(not(test), allow(dead_code))] // used by the label subcommand (Task 3.17)
 mod clarify;
 mod grammar;
-mod prompts;
-// used by the label subcommand (Task 3.17)
-#[cfg_attr(not(test), allow(dead_code))]
+mod label;
 mod naming;
-// used by the label subcommand (Task 3.17)
-#[cfg_attr(not(test), allow(dead_code))]
+mod prompts;
 mod render;
-// used by the label subcommand (Task 3.17)
-#[cfg_attr(not(test), allow(dead_code))]
 mod rng;
 mod templates;
 mod wire;
 
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl | minicut meaning --call JSON --probe JSON | minicut system-prompt";
+const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl | minicut meaning --call JSON --probe JSON | minicut system-prompt | minicut label --seed N --out ROWS --meta META";
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter()
@@ -28,8 +22,31 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(|s| s.as_str()) {
+        Some("label") => {
+            let seed = flag(&args, "--seed").and_then(|s| s.parse::<u64>().ok());
+            let (Some(seed), Some(out), Some(meta)) =
+                (seed, flag(&args, "--out"), flag(&args, "--meta"))
+            else {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            };
+            let mut g = label::Generator::new(seed);
+            let rows = g.run(&label::Counts::pilot_matched());
+            let lines: String = rows.iter().map(|r| r.line() + "\n").collect();
+            let metas: String = rows.iter().map(|r| label::dumps(&r.meta) + "\n").collect();
+            if let Err(e) = std::fs::write(out, lines).and_then(|_| std::fs::write(meta, metas)) {
+                eprintln!("cannot write: {e}");
+                return ExitCode::from(1);
+            }
+            eprintln!(
+                "{} rows ({} resampled draws) -> {out}, {meta}",
+                rows.len(),
+                g.resampled
+            );
+            ExitCode::SUCCESS
+        }
         Some("templates") if args.iter().any(|a| a == "--markdown") => {
-            print!("{}", templates::markdown());
+            print!("{}{}", templates::markdown(), clarify::markdown());
             ExitCode::SUCCESS
         }
         Some("grammar") => {
