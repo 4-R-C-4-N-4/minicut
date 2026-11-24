@@ -41,11 +41,11 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 | `v3_remove_last_pct` | RemoveLast | Pct | Always | probe | cut the last {pct} off {file} | 'cut ... off' removes |
 | `scale_t1` | ScaleExact | NoTime | Always | text | make {file} {w}x{h} | exact size |
 | `scale_t2` | ScaleExact | NoTime | Always | text | resize {file} to {w} by {h} | exact size |
-| `scale_t3` | ScaleExact | NoTime | Is720p | text | scale {file} to 720p | 720p means 1280x720 in this tool's vocabulary |
+| `scale_t3` | ScaleExact | NoTime | Is720p | probe | scale {file} to 720p | 720p means 1280x720 in this tool's vocabulary |
 | `scale_t3` | ScaleExact | NoTime | Always | text | resize {file} to {w}x{h} | v1 scale_t3 non-720p branch |
 | `train_scale_x1` | ScaleExact | NoTime | BothSmaller | text | scale {file} down to {w}x{h} | v1 picked up/down by tuple order; now only when both dims shrink |
 | `train_scale_x1` | ScaleExact | NoTime | BothLarger | text | scale {file} up to {w}x{h} | only when both dims grow |
-| `train_scale_x2` | ScaleExact | NoTime | Is540p | text | make {file} 540p | 540p means 960x540 here |
+| `train_scale_x2` | ScaleExact | NoTime | Is540p | probe | make {file} 540p | 540p means 960x540 here |
 | `v3_half_size` | ScaleHalf | NoTime | Always | probe | shrink {file} to half size | label from scale_half (exact, even) |
 | `v3_half_size_2` | ScaleHalf | NoTime | Always | probe | make {file} half its size | label from scale_half |
 | `v3_quarter_size` | ScaleQuarter | NoTime | Always | probe | shrink {file} to a quarter of its size | label from scale_quarter (exact, even) |
@@ -53,7 +53,7 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 | `speed_t1` | SpeedFactor | NoTime | FactorAbove1 | text | speed up {file} by {f}x | faster |
 | `speed_t1` | SpeedFactor | NoTime | FactorBelow1 | text | slow {file} down to {f}x | slower |
 | `speed_t2` | SpeedFactor | NoTime | FactorAbove1 | text | make {file} {f} times as fast | faster |
-| `speed_t2` | SpeedFactor | NoTime | FactorBelow1 | text | play {file} at {f}x speed | slower |
+| `speed_t2` | SpeedFactor | NoTime | FactorBelow1 | text | play {file} at {f}x speed | wording fits any factor; v1 used it for factors below 1 |
 | `speed_t4` | SpeedFactor | NoTime | Always | text | run {file} at {f}x speed | either way |
 | `train_speed_x2` | SpeedFactor | NoTime | Always | text | change {file} to play at {f}x | either way |
 | `train_speed_x1` | SpeedFaster | NoTime | Always | text | make {file} {p}% faster | label from speed_percent_faster: 1 + p/100 |

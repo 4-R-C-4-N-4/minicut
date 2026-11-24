@@ -1052,6 +1052,46 @@ mod tests {
     use super::*;
 
     #[test]
+    fn every_template_and_ambiguous_row_renders_with_a_full_fill() {
+        // A typo'd placeholder fails here, at authoring time, not mid-generation.
+        let full = Fill {
+            file: "clip.mp4".into(),
+            a: Some(5000),
+            b: Some(12000),
+            pct: Some(25),
+            w: Some(960),
+            h: Some(540),
+            f_pm: Some(1250),
+            p: Some(25),
+            codec: Some("libx264"),
+            container: Some("mkv"),
+            fmt: Some("mp3"),
+            n: Some(2),
+        };
+        for t in TEMPLATES {
+            let s = render(t.text, t.num, &full);
+            assert!(!s.contains('{') && !s.contains('}'), "{}: {s}", t.id);
+        }
+        for a in AMBIGUOUS {
+            let s = render(a.text, a.num, &full);
+            assert!(!s.contains('{') && !s.contains('}'), "{}: {s}", a.id);
+        }
+    }
+
+    #[test]
+    fn fixtures_are_long_enough_for_the_sampler() {
+        // sample_time_intent and clarify_reading_row subtract up to 2500 ms
+        // and need room for a 2 s keep on a 0.5 s grid.
+        for f in FIXTURES {
+            assert!(
+                f.clip.duration_ms >= 10000,
+                "{} is too short for the sampler",
+                f.name
+            );
+        }
+    }
+
+    #[test]
     fn dumps_matches_python_json() {
         // python3 -c 'import json; print(json.dumps({"tool": "trim", "start": 12.0, "end": 7.5, "q": "a\"b—c"}))'
         let j = J::O(vec![

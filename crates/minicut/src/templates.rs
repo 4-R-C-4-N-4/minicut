@@ -93,7 +93,10 @@ impl Template {
     /// need hidden fixture information"). Their proofs stay for a future
     /// intent-level output where the app resolves them against the probe.
     pub fn needs_probe(&self) -> bool {
+        // "720p"/"540p" fix a width by assuming a 16:9 source; the model
+        // never sees the aspect ratio (found in the PR #5 dataset audit).
         self.num == Num::Pct
+            || matches!(self.applies, Applies::Is720p | Applies::Is540p)
             || matches!(
                 self.kind,
                 IntentKind::KeepLast
@@ -482,7 +485,7 @@ pub const TEMPLATES: &[Template] = &[
         N::NoTime,
         "play {file} at {f}x speed",
         A::FactorBelow1,
-        "slower",
+        "wording fits any factor; v1 used it for factors below 1",
     ),
     t(
         "speed_t4",
@@ -1182,6 +1185,15 @@ mod tests {
                 "every template names the file: {}",
                 t.id
             );
+        }
+    }
+
+    #[test]
+    fn named_sizes_need_the_probe() {
+        for t in TEMPLATES {
+            if matches!(t.applies, Applies::Is720p | Applies::Is540p) {
+                assert!(t.needs_probe(), "{}: a named size assumes 16:9", t.id);
+            }
         }
     }
 

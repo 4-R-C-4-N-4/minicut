@@ -2,11 +2,11 @@
   "input": 4454,
   "kept": 2319,
   "dropped_by_reason": {
-    "combo_arg_pool": 72,
+    "combo_arg_pool": 75,
     "eval_prompt_canon_collision": 21,
     "eval_prompt_collision": 4,
-    "eval_tid_canon_collision": 350,
-    "over_target": 1688
+    "eval_tid_canon_collision": 360,
+    "over_target": 1675
   },
   "kept_by_tool": {
     "clarify": 310,

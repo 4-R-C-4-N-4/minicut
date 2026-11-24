@@ -213,25 +213,25 @@ python -m training.build_verified --rows "$TMPDIR/candidates.jsonl" \
 mv training/stats.json training/train_verified_v1_stats.json
 ```
 
-- SHA-256 `b9f0e4531b75e8fe4bd1407e9b433a0983c46afba973f082bc00777e95edf736` (rows), `74a1ccc5…e09e1cf` (meta).
+- SHA-256 `4a787fa231e1df65a9fa517bf606fb0e165b89274ac9d49f75a67ceafb328ca1` (rows), `b4d5738b0b7c42045dd415bf11148b4ce7a6336a06bbfd8af67eb76adaa7f178` (meta).
   The same bytes come from a debug and a release build.
 - **Counts:** trim 306, cut_out 368, concat 223, scale 255, speed 300, convert 193, extract_audio 244,
   mute 120, clarify 310. Clarify splits into 250 argument-missing rows (the `missing` list is computed by
   the core; the question offers our phrasings) and 60 reading-ambiguous rows (`missing: []`; the question
   offers both readings in the user's own terms).
-- **Freeze gate** (drop-only; `training/train_verified_v1_stats.json`): 4,454 candidates → 350
-  (template id, label) eval collisions, 72 combo-pool args, 21 (prompt, label) collisions, 4 eval prompts,
-  1,688 over target → 2,319 kept.
+- **Freeze gate** (drop-only; `training/train_verified_v1_stats.json`): 4,454 candidates → 360
+  (template id, label) eval collisions, 75 combo-pool args, 21 (prompt, label) collisions, 4 eval prompts,
+  1,675 over target → 2,319 kept.
 - **Labels never need hidden clip facts.** Last-N, percentage and relative-size wordings need the clip's
   duration or size, which the model never sees. Those templates are marked `probe` in `docs/templates.md`
   and are not used for tool rows. A test checks across 3 full datasets that one prompt never maps to
   two targets.
 - **Acceptance** (`scripts/accept_dataset.py`, all PASS):
-  - pilot filters: 0 drops; 49 rows exempt only by a per-row proof that the prompt states the label
-    (43 clock round-trips, 6 named sizes);
+  - pilot filters: 0 drops; 48 rows exempt only by a per-row proof that the clock text round-trips to the label.
+    Named sizes ("540p") are not exempt: they assume a 16:9 source (P3-D12);
   - `validate.py`: 2,319 / 2,319;
   - llama.cpp `test-gbnf-validator` against `minicut grammar`: 2,319 / 2,319;
-  - tokenizer preflight: max 645 tokens, min supervised 26;
+  - tokenizer preflight: max 649 tokens, min supervised 26;
   - release-grader meaning agreement: 16 / 16 trim/cut_out cases.
 
 ## Tests

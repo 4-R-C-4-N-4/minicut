@@ -48,7 +48,6 @@ def _rows_and_meta(rows_path: Path, meta_path: Path):
 
 # --- (a) pilot_filters ------------------------------------------------------
 _CLOCK = re.compile(r"\b(\d+):(\d{2})(?:\.(\d{1,3}))?\b")
-NAMED_SIZES = {"720p": (1280, 720), "540p": (960, 540)}
 
 
 def _clock_round_trips(prompt: str, label: dict) -> bool:
@@ -61,17 +60,11 @@ def _clock_round_trips(prompt: str, label: dict) -> bool:
         abs(t - float(v)) < 1e-9 for t, v in zip(times, (label["start"], label["end"])))
 
 
-def _named_size(prompt: str, label: dict) -> bool:
-    """A named size ("540p") is in the tool's vocabulary: exempt only when the
-    label is exactly that size."""
-    return any(re.search(rf"\b{n}\b", prompt) and (label.get("width"), label.get("height")) == wh
-               for n, wh in NAMED_SIZES.items())
-
-
-# v1 heuristic -> (name of the per-row check that replaces it, check)
+# v1 heuristic -> (name of the per-row check that replaces it, check).
+# Named sizes ("540p") are NOT exempt: they assume a 16:9 source, which the
+# model cannot see (plan P3-D12; PR #5 dataset audit).
 EXEMPTIONS = {
     "mmss_fraction": ("clock_text_round_trips", _clock_round_trips),
-    "scale_dims_not_in_prompt": ("named_size", _named_size),
 }
 
 

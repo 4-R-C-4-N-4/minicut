@@ -118,7 +118,8 @@ rows.jsonl + meta.jsonl ──► training/build_verified.py (freeze gate, drop-
 14. **P3-D14 v1 heuristics are not waived, they are re-proved per row.** `build_pilot`'s `mmss_fraction`
     and `scale_dims_not_in_prompt` exist because v1's renderer lost information. The acceptance check
     exempts a row only when a per-row check shows the prompt states the label (clock text round-trips to
-    start/end; "540p" == 960x540), and it names every exemption.
+    start/end), and it names every exemption. Named sizes ("540p" → 960x540) were first exempted, then
+    excluded after the PR #5 dataset audit: they assume a 16:9 source the model cannot see (P3-D12).
 
 ## Open questions (default in brackets)
 

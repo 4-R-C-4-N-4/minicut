@@ -160,13 +160,10 @@ def test_clock_fraction_is_exempt_only_when_prompt_round_trips(tmp_path):
     assert not ok, detail
 
 
-def test_named_size_is_exempt_only_for_its_exact_dims(tmp_path):
-    good = [("make b.mp4 540p", {"tool": "scale", "input": "b.mp4", "width": 960, "height": 540},
-             _meta(template_id="train_scale_x2", tool="scale"))]
-    ok, detail = _filters(tmp_path, good)
-    assert ok, detail
-    assert "named_size" in detail
-    wrong = [("make b.mp4 540p", {"tool": "scale", "input": "b.mp4", "width": 540, "height": 960},
-              _meta(template_id="train_scale_x2", tool="scale"))]
-    ok, detail = _filters(tmp_path, wrong)
+def test_named_size_is_not_exempt(tmp_path):
+    # "540p" assumes a 16:9 source the model cannot see (P3-D12): it must fail.
+    row = [("make b.mp4 540p", {"tool": "scale", "input": "b.mp4", "width": 960, "height": 540},
+            _meta(template_id="train_scale_x2", tool="scale"))]
+    ok, detail = _filters(tmp_path, row)
     assert not ok, detail
+    assert "scale_dims_not_in_prompt" in detail
