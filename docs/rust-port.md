@@ -110,7 +110,9 @@ ffmpeg → ffprobe verify → hard-link publish.
    covered by differential tests against `validate.py`.
 4. **The binary's grammar is PR #3's strict grammar.** It was
    validated with llama.cpp `test-gbnf-validator`: 1262/1262 training
-   and eval targets accepted, 6/6 known-bad calls rejected. Every rule
+   and eval targets accepted, 6/6 known-bad calls rejected (run on the
+   author's machine; CI has no llama.cpp, so CI checks rule equality
+   with the golden file, not parsing). Every rule
    line the Rust emitter writes must equal that file. Only the header
    comment differs.
 5. **No-op policy is a separate predicate.** `well_formed` matches
@@ -156,6 +158,10 @@ claim is backed by at least one killed mutant in `scripts/mutate_core.sh`):
 - Meaning of each single-input edit: speed keeps exactly
   ⌊duration / factor⌋, so faster is shorter and slower is never shorter.
   scale, convert, extract_audio and mute keep the full duration.
+- `label` on its own does not promise an *accepted* edit: an intent
+  outside the clip still gets a correctly-meaning label that `validate`
+  rejects. Phase 3 makes `label` crate-private and adds `try_label`,
+  whose `Some` result is proved accepted (plan Tasks 3.1–3.3).
 - For every intent, `label(i)` keeps the right *amount*
   (`kept_ms == intent_kept`) and the right *instants*: at every source
   time t inside the clip, t survives the edit exactly when the request,
@@ -204,7 +210,11 @@ every mutant, differential parity 100%.
 template by template from `minicut/build.py`), run with timeout,
 verify (ffprobe only), staging + hard-link publish, llama client,
 CLI with the same flags and exit codes as `minicut/cli.py`, plus an
-`apply --call JSON --workdir DIR` subcommand for graders.
+`apply --call JSON --workdir DIR` subcommand for graders. The CLI and
+`apply` must drop the model's `output` field *before* validating, as
+`cli.bind_files` and `wrapper.edit` do: the application owns output
+names. `minicut validate` keeps checking `output`, because it mirrors
+`validate.py`, which does (parity now samples `output`).
 Parity gate: `python -m eval.release controls` passes when the editor
 is the Rust binary (38/38 expected outcomes, all wrong-but-executable
 and tampering controls caught), 200/200 dev oracle cases, and

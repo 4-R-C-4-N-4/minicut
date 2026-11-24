@@ -20,15 +20,18 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("validate") if args.iter().any(|a| a == "--batch") => {
-            // JSONL on stdin: {"call": <raw call string>, "probe": {...}} -> {"ok": bool}
+            // JSONL on stdin: {"call": <raw call string>, "probe": {...}}.
+            // One verdict per row; a malformed row is a rejection, not a crash.
             use std::io::BufRead;
             for line in std::io::stdin().lock().lines() {
-                let line = line.expect("stdin");
-                let row: serde_json::Value = serde_json::from_str(&line).expect("batch row");
-                let probe: wire::WireProbe =
-                    serde_json::from_value(row["probe"].clone()).expect("probe");
-                let ok = wire::validate(row["call"].as_str().expect("call string"), &probe).is_ok();
-                println!("{}", serde_json::json!({"ok": ok}));
+                let verdict = match line.map_err(|e| e.to_string()).and_then(|l| batch_row(&l)) {
+                    Ok(Ok(())) => serde_json::json!({"ok": true}),
+                    Ok(Err(e)) => serde_json::json!({"ok": false, "error": e}),
+                    Err(e) => {
+                        serde_json::json!({"ok": false, "error": format!("bad batch row: {e}")})
+                    }
+                };
+                println!("{verdict}");
             }
             ExitCode::SUCCESS
         }
@@ -64,4 +67,13 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+/// Outer error: the row itself is malformed. Inner result: the validator's verdict.
+fn batch_row(line: &str) -> Result<Result<(), String>, String> {
+    let row: serde_json::Value = serde_json::from_str(line).map_err(|e| e.to_string())?;
+    let call = row["call"].as_str().ok_or("`call` must be a JSON string")?;
+    let probe: wire::WireProbe =
+        serde_json::from_value(row["probe"].clone()).map_err(|e| format!("probe: {e}"))?;
+    Ok(wire::validate(call, &probe).map(|_| ()))
 }

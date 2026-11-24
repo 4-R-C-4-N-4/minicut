@@ -71,6 +71,11 @@ def sample(rng: random.Random):
         call["missing"] = ["start", "end"]
     if tool not in ("concat", "clarify") and rng.random() < 0.02:
         call["inputs"] = ["a.mp4", "b.mp4"]  # see DIVERGENCES
+    if tool != "clarify" and rng.random() < 0.15:
+        # validate.py path-checks `output` too; both sides must agree. (The
+        # Python CLI/wrapper strip `output` before validating; Phase 2's Rust
+        # CLI must do the same: docs/rust-port.md, Phase 2.)
+        call["output"] = rng.choice(["out.mp4", "renders/out.mp4", "/abs.mp4", "../up.mp4", ""])
     return call, probe
 
 
