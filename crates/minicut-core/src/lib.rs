@@ -396,6 +396,51 @@ pub fn pct_of(duration_ms: u64, pct: u64) -> (r: Option<u64>)
     }
 }
 
+// "half size" / "a quarter of its size": exact, and still even (yuv420p).
+// Constant factors with bit-vector proofs: a variable divisor, and then
+// plain nonlinear reasoning, were seed-dependent (rlimit under some seeds).
+pub fn scale_half(w: u32, h: u32) -> (r: Option<(u32, u32)>)
+    ensures
+        match r {
+            Some((rw, rh)) => rw * 2 == w && rh * 2 == h && rw % 2 == 0 && rh % 2 == 0 && rw > 0 && rh > 0,
+            None => !(w > 0 && h > 0 && w % 4 == 0 && h % 4 == 0),
+        },
+{
+    if w > 0 && h > 0 && w % 4 == 0 && h % 4 == 0 {
+        let (rw, rh) = (w / 2, h / 2);
+        proof {
+            assert(rw * 2 == w && rw % 2 == 0 && rw > 0) by (bit_vector)
+                requires rw == w / 2, w % 4 == 0, w > 0;
+            assert(rh * 2 == h && rh % 2 == 0 && rh > 0) by (bit_vector)
+                requires rh == h / 2, h % 4 == 0, h > 0;
+        }
+        Some((rw, rh))
+    } else {
+        None
+    }
+}
+
+pub fn scale_quarter(w: u32, h: u32) -> (r: Option<(u32, u32)>)
+    ensures
+        match r {
+            Some((rw, rh)) => rw * 4 == w && rh * 4 == h && rw % 2 == 0 && rh % 2 == 0 && rw > 0 && rh > 0,
+            None => !(w > 0 && h > 0 && w % 8 == 0 && h % 8 == 0),
+        },
+{
+    if w > 0 && h > 0 && w % 8 == 0 && h % 8 == 0 {
+        let (rw, rh) = (w / 4, h / 4);
+        proof {
+            assert(rw * 4 == w && rw % 2 == 0 && rw > 0) by (bit_vector)
+                requires rw == w / 4, w % 8 == 0, w > 0;
+            assert(rh * 4 == h && rh % 2 == 0 && rh > 0) by (bit_vector)
+                requires rh == h / 4, h % 8 == 0, h > 0;
+        }
+        Some((rw, rh))
+    } else {
+        None
+    }
+}
+
 } // verus!
 
 #[cfg(test)]
