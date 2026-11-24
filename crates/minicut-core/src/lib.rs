@@ -211,6 +211,7 @@ pub(crate) fn label(i: Intent, c: Clip) -> (e: Edit)
             _ => true,
         },
     ensures
+        e == label_spec(i, c),
         kept_ms(e, c) == intent_kept(i, c),
         // where: every source instant inside the clip survives exactly when
         // the request says it should
@@ -225,6 +226,30 @@ pub(crate) fn label(i: Intent, c: Clip) -> (e: Edit)
         Intent::RemoveFirst { ms } => Edit::CutOut { start_ms: 0, end_ms: ms },
         Intent::KeepLast { ms } => Edit::Trim { start_ms: c.duration_ms - ms, end_ms: c.duration_ms },
         Intent::RemoveLast { ms } => Edit::CutOut { start_ms: c.duration_ms - ms, end_ms: c.duration_ms },
+    }
+}
+
+// Total, checked entry point for unverified callers. Verus does not enforce
+// `requires` across the verus! boundary, so app code must never call `label`
+// directly. None exactly when the request cannot be labelled, or when its
+// label would be rejected by the runtime validator.
+pub open spec fn labelable(i: Intent, c: Clip) -> bool {
+    match i {
+        Intent::KeepLast { ms } => ms <= c.duration_ms,
+        Intent::RemoveLast { ms } => ms <= c.duration_ms,
+        _ => true,
+    }
+}
+
+// Spec-level label, so a None result can be explained without exec code.
+pub open spec fn label_spec(i: Intent, c: Clip) -> Edit {
+    match i {
+        Intent::KeepRange { start_ms, end_ms } => Edit::Trim { start_ms, end_ms },
+        Intent::RemoveRange { start_ms, end_ms } => Edit::CutOut { start_ms, end_ms },
+        Intent::KeepFirst { ms } => Edit::Trim { start_ms: 0, end_ms: ms },
+        Intent::RemoveFirst { ms } => Edit::CutOut { start_ms: 0, end_ms: ms },
+        Intent::KeepLast { ms } => Edit::Trim { start_ms: (c.duration_ms - ms) as u64, end_ms: c.duration_ms },
+        Intent::RemoveLast { ms } => Edit::CutOut { start_ms: (c.duration_ms - ms) as u64, end_ms: c.duration_ms },
     }
 }
 
