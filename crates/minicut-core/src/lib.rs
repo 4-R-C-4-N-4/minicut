@@ -87,4 +87,24 @@ pub fn validate(e: Edit, c: Clip) -> (ok: bool)
     }
 }
 
+// ------------------------------------------- spec: meaning (what survives) --
+pub open spec fn kept_ms(e: Edit, c: Clip) -> int {
+    match e {
+        Edit::Trim { start_ms, end_ms } => end_ms - start_ms,
+        Edit::CutOut { start_ms, end_ms } => c.duration_ms - (end_ms - start_ms),
+        Edit::Speed { factor_pm } => c.duration_ms * 1000 / factor_pm as int,
+        _ => c.duration_ms as int,
+    }
+}
+
+pub proof fn trim_cut_partition(s: u64, e: u64, c: Clip)
+    requires well_formed(Edit::Trim { start_ms: s, end_ms: e }, c)
+    ensures
+        kept_ms(Edit::Trim { start_ms: s, end_ms: e }, c)
+            + kept_ms(Edit::CutOut { start_ms: s, end_ms: e }, c) == c.duration_ms,
+        kept_ms(Edit::Trim { start_ms: s, end_ms: e }, c) > 0,
+        kept_ms(Edit::CutOut { start_ms: s, end_ms: e }, c) >= 0,
+{
+}
+
 } // verus!
