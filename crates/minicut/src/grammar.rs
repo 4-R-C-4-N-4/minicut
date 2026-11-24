@@ -1,5 +1,5 @@
 //! GBNF grammar for llama.cpp, emitted from one table of tool shapes.
-//! Rule lines must equal the PR #3 grammar (validated with llama.cpp's
+//! Rule lines must equal tests/golden/minicut.gbnf (from b460cfd, validated with llama.cpp's
 //! test-gbnf-validator); the header comment is this crate's own.
 
 /// JSON value kinds a field may take.

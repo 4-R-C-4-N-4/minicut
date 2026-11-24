@@ -196,8 +196,9 @@ pub fn to_parsed(call: &WireCall) -> Result<Parsed, String> {
         },
         Scale { width, height, .. } => Edit::Scale { width, height },
         Speed { factor, .. } => {
-            let pm = secs_to_ms(factor)
-                .ok_or_else(|| format!("speed factor must be 0.25..4.0, got {factor}"))?;
+            let pm = secs_to_ms(factor).ok_or_else(|| {
+                format!("speed factor must be a non-negative number, got {factor}")
+            })?;
             Edit::Speed { factor_pm: pm }
         }
         Convert {

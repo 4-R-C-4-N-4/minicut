@@ -109,6 +109,15 @@ fn rejects_wrong_shapes_and_types() {
 }
 
 #[test]
+fn rejects_duplicate_keys() {
+    // Python's json.loads keeps the last value; Rust refuses the call. The
+    // stricter side is intended (docs/rust-port.md, open question 5).
+    assert!(!accepts(
+        r#"{"tool":"mute","input":"a.mp4","input":"b.mp4"}"#
+    ));
+}
+
+#[test]
 fn rejects_unsafe_paths() {
     assert!(!accepts(r#"{"tool":"mute","input":"/etc/passwd"}"#));
     assert!(!accepts(r#"{"tool":"mute","input":"../clip.mp4"}"#));

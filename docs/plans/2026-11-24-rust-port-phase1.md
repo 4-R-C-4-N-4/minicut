@@ -1376,3 +1376,14 @@ Note: open question 5 (Python accepts an extra `inputs` key on non-concat tools)
 Add a PROGRESS.md section with the verify count, mutation result, parity count and the commands (`scripts/verus.sh`, `scripts/mutate_core.sh`, `cargo test --workspace`, `scripts/parity_validate.py`). In the README layout list add `crates/` with one line. No user-facing behaviour changes in Phase 1.
 
 **Commit:** `git commit -m "docs: rust port phase 1 status"`
+
+---
+
+## Addendum: review fixes (applied after Tasks 0.1–1.14)
+
+An adversarial proof review found two spec gaps that the eight original mutants did not cover.
+
+- **Unconstrained `kept_ms` arms.** No lemma used `kept_ms` for speed, scale, convert, extract_audio or mute, so inverting the speed formula still verified. Added `speed_meaning` (kept·f ≤ dur·1000 < (kept+1)·f; faster is shorter; slower is never shorter) and `duration_preserving`. Concat is explicitly a placeholder until Phase 2.
+- **Position-blind labels.** `label`'s ensures checked only the amount kept and the tool family, so "remove the last N" → `CutOut(0, N)` verified. Added `survives(e, t)` and `intent_survives(i, c, t)`. `label` now ensures they agree at every instant inside the clip.
+- `scripts/mutate_core.sh` now has 12 mutants (adds speed inversion, mute duration, zero-length trim, remove-last-as-first). It reads the Verus pin from `scripts/verus.sh` and aborts if the baseline fails. Expected: one `stable:` line and 12 `killed:` lines. `scripts/verus.sh` → 21 verified.
+- Wire layer: duplicate JSON keys are rejected (Python takes the last value); pinned by `rejects_duplicate_keys`. The speed error text no longer hardcodes the range.

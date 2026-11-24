@@ -107,6 +107,47 @@ pub proof fn trim_cut_partition(s: u64, e: u64, c: Clip)
 {
 }
 
+// Speed: the kept duration is duration / factor, rounded down, stated
+// multiplicatively, and it moves the right way: faster is shorter, slower is
+// never shorter. (Pins the Speed arm of kept_ms; without this nothing did.)
+pub proof fn speed_meaning(f: u64, c: Clip)
+    requires well_formed(Edit::Speed { factor_pm: f }, c)
+    ensures
+        kept_ms(Edit::Speed { factor_pm: f }, c) * f <= c.duration_ms * 1000,
+        c.duration_ms * 1000 < (kept_ms(Edit::Speed { factor_pm: f }, c) + 1) * f,
+        f > 1000 && c.duration_ms > 0 ==> kept_ms(Edit::Speed { factor_pm: f }, c) < c.duration_ms,
+        f < 1000 ==> kept_ms(Edit::Speed { factor_pm: f }, c) >= c.duration_ms,
+{
+    let k = kept_ms(Edit::Speed { factor_pm: f }, c);
+    let d = c.duration_ms as int;
+    let fi = f as int;
+    assert(k == d * 1000 / fi);
+    assert(k * fi <= d * 1000 && d * 1000 < (k + 1) * fi) by (nonlinear_arith)
+        requires k == d * 1000 / fi, fi > 0;
+    if f > 1000 && d > 0 {
+        assert(k < d) by (nonlinear_arith)
+            requires k * fi <= d * 1000, fi > 1000, d > 0, k >= 0;
+    }
+    if f < 1000 {
+        assert(k >= d) by (nonlinear_arith)
+            requires d * 1000 < (k + 1) * fi, fi < 1000, fi > 0, d >= 0;
+    }
+}
+
+// scale, convert, extract_audio and mute keep the full duration
+// (verify.py checks each of these within tolerance).
+pub proof fn duration_preserving(e: Edit, c: Clip)
+    requires
+        e is Scale || e is Convert || e is ExtractAudio || e is Mute,
+    ensures
+        kept_ms(e, c) == c.duration_ms,
+{
+}
+
+// Concat's meaning is the sum of all input durations, which needs every
+// probed clip, not just the first. It is not modelled here: Phase 2 adds it
+// with a seq<Clip>. kept_ms(Concat) is a placeholder and no lemma uses it.
+
 // ------------------------------------------------ intents -> labels (data) --
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Intent {
@@ -130,6 +171,29 @@ pub open spec fn intent_kept(i: Intent, c: Clip) -> int {
     }
 }
 
+/// Does source time `t` (ms) survive the edit? Trim keeps [start, end);
+/// cut_out keeps everything outside it. Only trim/cut_out select time.
+pub open spec fn survives(e: Edit, t: int) -> bool {
+    match e {
+        Edit::Trim { start_ms, end_ms } => start_ms <= t && t < end_ms,
+        Edit::CutOut { start_ms, end_ms } => t < start_ms || end_ms <= t,
+        _ => true,
+    }
+}
+
+/// Which source times the request keeps, stated in the request's own terms
+/// (no tool, no start/end fields): "remove the last 5 s" keeps t < dur - 5 s.
+pub open spec fn intent_survives(i: Intent, c: Clip, t: int) -> bool {
+    match i {
+        Intent::KeepRange { start_ms, end_ms } => start_ms <= t && t < end_ms,
+        Intent::RemoveRange { start_ms, end_ms } => !(start_ms <= t && t < end_ms),
+        Intent::KeepFirst { ms } => t < ms,
+        Intent::RemoveFirst { ms } => t >= ms,
+        Intent::KeepLast { ms } => t >= c.duration_ms - ms,
+        Intent::RemoveLast { ms } => t < c.duration_ms - ms,
+    }
+}
+
 /// Which tool family the request means: keep-intents are trims,
 /// remove-intents are cut_outs. This is the keep/remove contract.
 pub open spec fn is_keep(i: Intent) -> bool {
@@ -148,6 +212,9 @@ pub fn label(i: Intent, c: Clip) -> (e: Edit)
         },
     ensures
         kept_ms(e, c) == intent_kept(i, c),
+        // where: every source instant inside the clip survives exactly when
+        // the request says it should
+        forall|t: int| 0 <= t < c.duration_ms ==> #[trigger] survives(e, t) == intent_survives(i, c, t),
         is_keep(i) <==> (e is Trim),
         !is_keep(i) <==> (e is CutOut),
 {

@@ -131,16 +131,27 @@ ffmpeg → ffprobe verify → hard-link publish.
 
 ## What is proved, and what is trusted
 
-Proved (Phase 1 targets, all demonstrated in the spike):
+Proved in Phase 1 (`scripts/verus.sh`: 21 verified, 0 errors; each
+claim is backed by at least one killed mutant in `scripts/mutate_core.sh`):
 - `validate(e, c) == accepted(e, c)` for every edit and clip.
 - trim and cut_out on the same range partition the clip.
-- For every intent: `kept_ms(label(i)) == intent_kept(i)`. Keep
-  intents label as `Trim` and remove intents as `CutOut`: the
-  keep/remove contract.
+- Meaning of each single-input edit: speed keeps exactly
+  ⌊duration / factor⌋, so faster is shorter and slower is never shorter.
+  scale, convert, extract_audio and mute keep the full duration.
+- For every intent, `label(i)` keeps the right *amount*
+  (`kept_ms == intent_kept`) and the right *instants*: at every source
+  time t inside the clip, t survives the edit exactly when the request,
+  stated in its own terms ("remove the last 5 s" keeps t < dur − 5 s),
+  says it should. Keep intents label as `Trim` and remove intents as
+  `CutOut`: the keep/remove contract.
 - `to_clock(ms)` loses nothing: `m*60000 + s*1000 + f == ms`.
 - atempo stages are each within 0.5–2.0×, and their product is within
   0.001× of the requested factor.
 - clarify `missing` is exactly required − provided.
+
+Not proved yet: concat's meaning (the sum of every input's duration)
+needs all probed clips. `kept_ms(Concat)` is a placeholder that no lemma
+uses; Phase 2 adds it with a `seq<Clip>`.
 
 Phase 2 targets: argv structure per tool (e.g. trim emits `-ss start
 -to end` from the same ms values), the publish name sequence being
@@ -230,9 +241,12 @@ revisit only for bounded checks of the unverified layer).
 4. `extract_audio` on a silent input: keep parity (accepted, then
    verification fails) or reject up front? [Parity in Phases 1–2;
    tighten after cutover as its own change with its own test.]
-5. Python `validate.py` lets non-concat tools carry an `inputs` key.
-   The Rust wire layer rejects unknown fields. [Reject, a listed
-   divergence; the grammar already forbids it.]
+5. Python `validate.py` lets non-concat tools carry an `inputs` key,
+   and `json.loads` takes the last value for duplicate keys. The Rust
+   wire layer rejects both. [Reject. Both are named divergences: the
+   first in `scripts/parity_validate.py`, the second pinned by
+   `crates/minicut/tests/validate.rs`. The grammar already forbids
+   both shapes.]
 6. Binary name during the transition: the Rust bin is `minicut`,
    which clashes with the Python console script if both are installed.
    [Keep `minicut`; tests call the cargo target path directly; the
