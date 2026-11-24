@@ -161,4 +161,12 @@ pub fn label(i: Intent, c: Clip) -> (e: Edit)
     }
 }
 
+// --------------------------------------------- clock rendering (mm:ss.fff) --
+pub fn to_clock(ms: u64) -> (r: (u64, u64, u64))
+    ensures r.0 * 60000 + r.1 * 1000 + r.2 == ms, r.1 < 60, r.2 < 1000,
+{
+    let rem = ms % 60000;
+    (ms / 60000, rem / 1000, rem % 1000)
+}
+
 } // verus!
