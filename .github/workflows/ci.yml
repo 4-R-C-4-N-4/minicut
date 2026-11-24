@@ -33,6 +33,7 @@ jobs:
       - run: cargo build
       - run: python scripts/parity_validate.py --bin target/debug/minicut --n 20000 --seed 0
       - run: python scripts/parity_validate.py --bin target/debug/minicut --n 20000 --seed 1
+      - run: python -m pytest tests/test_rust_prompts.py -q
 
   verus:
     runs-on: ubuntu-24.04
