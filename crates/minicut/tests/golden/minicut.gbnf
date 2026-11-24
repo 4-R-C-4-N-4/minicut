@@ -1,0 +1,20 @@
+# Golden grammar rules for `minicut grammar` (comment lines are ignored by the test).
+# Source: minicut/grammar/minicut.gbnf at b460cfd (closed PR #3), rule lines unchanged.
+# Checked with llama.cpp test-gbnf-validator: 1262/1262 training + eval targets accepted,
+# 6/6 known-bad calls rejected (wrong field names, 1-input concat, h264, field order, float dims).
+root ::= trim-call | cut-out-call | concat-call | scale-call | speed-call | convert-call | extract-audio-call | mute-call | clarify-call
+trim-call ::= "{" ws "\"tool\"" ws ":" ws "\"trim\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"start\"" ws ":" ws number ws "," ws "\"end\"" ws ":" ws number (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+cut-out-call ::= "{" ws "\"tool\"" ws ":" ws "\"cut_out\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"start\"" ws ":" ws number ws "," ws "\"end\"" ws ":" ws number (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+concat-call ::= "{" ws "\"tool\"" ws ":" ws "\"concat\"" ws "," ws "\"inputs\"" ws ":" ws str-list-2 (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+scale-call ::= "{" ws "\"tool\"" ws ":" ws "\"scale\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"width\"" ws ":" ws int ws "," ws "\"height\"" ws ":" ws int (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+speed-call ::= "{" ws "\"tool\"" ws ":" ws "\"speed\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"factor\"" ws ":" ws number (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+convert-call ::= "{" ws "\"tool\"" ws ":" ws "\"convert\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"codec\"" ws ":" ws ("\"libx264\"" | "\"libx265\"" | "\"vp9\"") ws "," ws "\"container\"" ws ":" ws ("\"mp4\"" | "\"mkv\"" | "\"webm\"") (ws "," ws "\"crf\"" ws ":" ws int)? (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+extract-audio-call ::= "{" ws "\"tool\"" ws ":" ws "\"extract_audio\"" ws "," ws "\"input\"" ws ":" ws string ws "," ws "\"format\"" ws ":" ws ("\"mp3\"" | "\"wav\"" | "\"aac\"") (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+mute-call ::= "{" ws "\"tool\"" ws ":" ws "\"mute\"" ws "," ws "\"input\"" ws ":" ws string (ws "," ws "\"output\"" ws ":" ws string)? ws "}"
+clarify-call ::= "{" ws "\"tool\"" ws ":" ws "\"clarify\"" ws "," ws "\"question\"" ws ":" ws string (ws "," ws "\"missing\"" ws ":" ws str-list)? ws "}"
+string ::= "\"" ([^"\\] | "\\" .)* "\""
+number ::= "-"? [0-9]+ ("." [0-9]+)?
+int ::= [0-9]+
+str-list ::= "[" ws (string (ws "," ws string)*)? ws "]"
+str-list-2 ::= "[" ws string ws "," ws string (ws "," ws string)* ws "]"
+ws ::= [ \t\n]*

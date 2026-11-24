@@ -90,3 +90,4 @@ python -m eval.run_eval --all --backend http --label baseline_intent_v2 --out ev
 - `factory/` — fixture generator + fixture verifier
 - `config/tools.yaml` — tool registry (source of truth)
 - `tests/` — wrapper tests, 8 tools + negative checks
+- `crates/` — Rust port in progress: `minicut-core` (Verus-verified validate, edit meaning, intent labels, clock, atempo, clarify) and the `minicut` binary (`grammar`, `validate`). See `docs/rust-port.md`; the Python tool is still the shipped one.

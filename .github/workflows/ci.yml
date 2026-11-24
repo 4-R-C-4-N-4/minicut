@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pip install -e ".[dev]"
+      - run: python -m factory.generate --out factory/fixtures --all
+      - run: python -m pytest tests -q
+      - run: python -m eval.release controls
+
+  rust:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: cargo fmt --all --check
+      - run: cargo test --workspace
+      - run: cargo build
+      - run: python scripts/parity_validate.py --bin target/debug/minicut --n 20000 --seed 0
+      - run: python scripts/parity_validate.py --bin target/debug/minicut --n 20000 --seed 1
+
+  verus:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .verus
+            ~/.rustup/toolchains/1.100.0-x86_64-unknown-linux-gnu
+          key: verus-0.2026.11.22.1ce6a59
+      - run: scripts/verus.sh
+      - run: scripts/mutate_core.sh
