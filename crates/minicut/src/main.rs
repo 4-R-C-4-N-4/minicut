@@ -1,3 +1,5 @@
+#[cfg_attr(not(test), allow(dead_code))] // used by the label subcommand (Task 3.17)
+mod clarify;
 mod grammar;
 mod templates;
 mod wire;

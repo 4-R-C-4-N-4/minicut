@@ -102,7 +102,7 @@ intent kind. Labels never come from here; they come from the verified core.
 | `v3_amb_trim_first_half` | trim the first half of {file} | NoTime (50%) | KeepFirst | flip (keep ↔ remove, same span) | keep or remove the first half |
 | `v3_amb_trim_last_half` | trim the last half of {file} | NoTime (50%) | KeepLast | flip (keep ↔ remove, same span) | keep or remove the last half |
 | `v3_amb_cut_first` | cut the first {b} seconds of {file} | Secs | RemoveFirst | flip (keep ↔ remove, same span) | without 'off' or 'down to', 'cut the first N seconds of X' is read both ways |
-| `v3_amb_quiet` | make {file} quiet | NoTime | Mute | unsupported: lowering the volume | v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do |
+| `v3_amb_quiet` | make {file} quiet | NoTime | Mute | unsupported: lower the volume | v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do |
 
 ## Vocabulary offered in clarify questions
 

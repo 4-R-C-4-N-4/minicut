@@ -890,7 +890,7 @@ pub const AMBIGUOUS: &[Ambiguous] = &[
         num: N::NoTime,
         reading: K::Mute,
         fixed_pct: None,
-        other: Other::Unsupported("lowering the volume"),
+        other: Other::Unsupported("lower the volume"),
         note: "v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do",
     },
 ];
