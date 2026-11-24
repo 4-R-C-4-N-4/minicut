@@ -1,6 +1,6 @@
 # MiniCut in Rust, with a Verus-verified core
 
-Status: proposed, 2026-11-24. Nothing here is built yet. Phase 1 has a
+Status: Phases 0–1 implemented on branch `rust-port` (2026-11-24); Phases 2–4 not started. Phase 1 has a
 task plan in [plans/2026-11-24-rust-port-phase1.md](plans/2026-11-24-rust-port-phase1.md).
 
 ## Goal
@@ -52,6 +52,10 @@ Training (torch/peft) and eval grading stay in Python.
   share the constant. The differential test caught it (16
   mismatches). Verus proves code = spec; the parity test checks
   spec = shipped behaviour. Both are required.
+- **Proofs can depend on their context.** A division in an `ensures` clause
+  (atempo bound) verified only when an unrelated section followed it in the
+  file. The bound is now division-free, and `scripts/mutate_core.sh` first
+  checks that the unmutated core verifies standalone under five SMT seeds.
 - Constraint found: code inside `verus! {}` cannot do I/O
   (`println!` fails verification). Verified code and I/O live in
   separate crates.

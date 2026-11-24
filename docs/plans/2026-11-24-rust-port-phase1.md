@@ -499,7 +499,8 @@ pub fn atempo_stages(f: u64) -> (r: (u64, Option<u64>))
         stage_ok(r.0),
         match r.1 {
             None => r.0 == f,
-            Some(s2) => stage_ok(s2) && (r.0 * s2) / 1000 <= f && f <= (r.0 * s2) / 1000 + 1,
+            // product of stages, in per-mille^2, is within 0.001x of f
+            Some(s2) => stage_ok(s2) && r.0 * s2 <= f * 1000 && f * 1000 <= r.0 * s2 + 1000,
         },
 {
     if f > 2000 {
@@ -511,6 +512,8 @@ pub fn atempo_stages(f: u64) -> (r: (u64, Option<u64>))
     }
 }
 ```
+
+**Pitfall (found while landing this):** the first version stated the bound with division, `(r.0 * s2) / 1000 <= f`. It verified only when the clarify section followed it in the file, and failed deterministically under every seed without it. The division-free form above verifies alone and in the full file under seeds 0, 1, 2, 3 and 7. Keep `/` and `%` out of `ensures` clauses where a multiplication will do.
 
 This replaces `minicut/build.py:_atempo_chain`. That loop handles at most one extra stage in the 0.25..4.0 range; here it is explicit.
 
@@ -651,7 +654,7 @@ mutant "clock drops the fraction (v1 dataset bug)" \
 exit $survived
 ```
 
-Run: `scripts/mutate_core.sh`. Expected: eight `killed:` lines, exit 0. A `SURVIVED` line is a weak spec; fix the spec, never the mutant.
+Run: `scripts/mutate_core.sh`. Expected: one `stable:` line, eight `killed:` lines, exit 0. A `SURVIVED` line is a weak spec; fix the spec, never the mutant. An `UNSTABLE` line is a brittle proof (see Task 1.7).
 
 **Commit:** `git commit -m "test: mutation check for verified core"`
 

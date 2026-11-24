@@ -1,10 +1,15 @@
 # MiniCut progress
 
-## Rust port with a Verus-verified core (proposed)
+## Rust port, Phases 0–1: verified core + `grammar`/`validate` (branch `rust-port`)
 
-- Direction: ship `minicut` as a Rust binary whose core (validate, edit meaning, intent→label, clock, atempo, clarify `missing`) is proved with Verus/Z3. Training and eval stay Python. Contract: [docs/rust-port.md](docs/rust-port.md). Phase 0–1 tasks: [docs/plans/2026-11-24-rust-port-phase1.md](docs/plans/2026-11-24-rust-port-phase1.md).
-- Feasibility checked on this machine with Verus `0.2026.11.22.1ce6a59` (rustup 1.100.0, check-time only). Prototype core: 16 verified, 0 errors; 8/8 planted bugs rejected (keep/remove inversion, mm:ss fraction loss, clarify listing provided args, ...). Builds and tests with stock Rust 1.99. Grammar emitter matches PR #3's llama.cpp-validated grammar; parity with `validate.py` on 20,000 sampled calls: 0 mismatches.
-- PR #3 review: its grammar half is solid (1262/1262 targets accepted by llama.cpp's validator). Its Dafny file proves the spec consistent but nothing executes it, and the Rust core supersedes it. No code from this direction is committed yet.
+- State: implemented, independent review pending, not merged. The Python tool is still the shipped one; no Python file changed.
+- `crates/minicut-core`: entirely inside `verus!`, integer units (ms, per-mille), no I/O. Proved: `validate == accepted` (well-formed + no-op rule), trim/cut_out partition, intent→label keeps meaning and the keep/remove contract, lossless mm:ss clock, atempo stages in range and within 0.001×, clarify `missing` = required − provided. `scripts/verus.sh` → 16 verified, 0 errors (Verus `0.2026.11.22.1ce6a59`, check-time only).
+- `scripts/mutate_core.sh`: the core verifies standalone under SMT seeds 0 1 2 3 7, and 8/8 planted bugs are rejected (keep/remove inversion, mm:ss fraction loss, clarify listing provided args, off-by-one label, odd dims, speed-1x no-op, two atempo faults).
+- Found while landing: the first atempo bound, which had division in its `ensures`, verified only when the clarify section followed it. Replaced with a division-free bound; the seed/standalone check now guards this class.
+- `crates/minicut`: `minicut grammar` rule lines equal the golden from closed PR #3 (`b460cfd`), which llama.cpp's validator accepted for 1262/1262 corpus and eval targets. `minicut validate` is a strict wire layer and the single float→integer boundary. 9 Rust tests on stock stable (1 core, 1 grammar golden, 7 validate boundary).
+- `scripts/parity_validate.py`: 20,000 sampled calls, 0 unexpected mismatches against `validate.py`. 75 hits of the one named divergence (an extra `inputs` key on single-input tools; Rust rejects it). A planted 10 ms tolerance drift is caught (20 mismatches, exit 1), while Verus still passes: proofs check code = spec, parity checks spec = shipped behaviour.
+- CI (`.github/workflows/ci.yml`): python (pytest + release controls), rust (fmt, tests, parity), verus (verify + mutation). First run is on the PR.
+- Next: Phase 2, the binary (probe, argv, run, verify, publish, CLI), gated on release controls through the Rust editor. See [docs/rust-port.md](docs/rust-port.md).
 
 ## CLI with stock model
 
