@@ -14,6 +14,38 @@ def _read(path):
     return [json.loads(line) for line in path.read_text().splitlines()]
 
 
+def pilot_drop_reason(prompt: str, call: dict, meta: dict, combos) -> str | None:
+    """Pure predicate for why a v1 row would be dropped from the pilot.
+
+    `call` must already reflect any mutation the pilot applies before
+    filtering (e.g. convert's forced crf=23) -- callers that need that
+    mutation to persist into the emitted row must apply it themselves;
+    this function never mutates its arguments.
+    """
+    if meta["kind"] == "general":
+        return "general"
+    if meta["template_id"] == "train_clarify_invalid":
+        return "clarify_invalid"
+    tool = call["tool"]
+    if tool in {"trim", "cut_out"}:
+        if "%" in prompt or "half" in prompt:
+            return "percent_or_half"
+        # v1's mm:ss renderer truncates fractional seconds.
+        if re.search(r"\d+:\d{2}", prompt) and any(call[k] % 1 for k in ("start", "end")):
+            return "mmss_fraction"
+    if tool == "scale" and not re.search(rf"\b{call['width']}(?:x| by ){call['height']}\b", prompt):
+        return "scale_dims_not_in_prompt"
+    if tool == "concat" and len(call["inputs"]) == 3 and not re.search(r"\bthree\b", prompt):
+        return "concat_three_unstated"
+    if tool == "convert":
+        if [call["codec"], call["container"], call["crf"]] in combos:
+            return "convert_combo_pool"
+    if tool == "extract_audio" and (call["input"] not in prompt or
+                                   not re.search(rf"(?<!\.)\b{call['format']}\b", prompt)):
+        return "extract_mismatch"
+    return None
+
+
 def build(root: Path):
     source = root / "training"
     freeze = json.loads((root / "eval/freeze.json").read_text())
@@ -22,28 +54,14 @@ def build(root: Path):
     rows, meta, seen = [], [], {}
     for line, (row, m) in enumerate(zip(_read(source / "train_v1.jsonl"),
                                          _read(source / "train_v1_meta.jsonl"), strict=True), 1):
-        if m["kind"] == "general" or m["template_id"] == "train_clarify_invalid":
-            continue
         messages = row["messages"]
         prompt = messages[1]["content"]
+        if m["kind"] == "general" or m["template_id"] == "train_clarify_invalid":
+            continue
         call = json.loads(messages[2]["content"])
-        tool = call["tool"]
-        if tool in {"trim", "cut_out"}:
-            if "%" in prompt or "half" in prompt:
-                continue
-            # v1's mm:ss renderer truncates fractional seconds.
-            if re.search(r"\d+:\d{2}", prompt) and any(call[k] % 1 for k in ("start", "end")):
-                continue
-        if tool == "scale" and not re.search(rf"\b{call['width']}(?:x| by ){call['height']}\b", prompt):
-            continue
-        if tool == "concat" and len(call["inputs"]) == 3 and not re.search(r"\bthree\b", prompt):
-            continue
-        if tool == "convert":
+        if call["tool"] == "convert":
             call["crf"] = 23  # None of the v1 conversion prompts requests a CRF.
-            if [call["codec"], call["container"], call["crf"]] in combos:
-                continue
-        if tool == "extract_audio" and (call["input"] not in prompt or
-                                       not re.search(rf"(?<!\.)\b{call['format']}\b", prompt)):
+        if pilot_drop_reason(prompt, call, m, combos) is not None:
             continue
         if (prompt in frozen or m["template_id"] in freeze["heldout_template_ids"]
                 or m["fixture"] == freeze["reserved_fixture"]):
