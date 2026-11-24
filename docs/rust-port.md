@@ -1,6 +1,8 @@
 # MiniCut in Rust, with a Verus-verified core
 
-Status: Phases 0–1 implemented on branch `rust-port` (2026-11-24); Phases 2–4 not started. Phase 1 has a
+Status: Phases 0–1 implemented on branch `rust-port` (2026-11-24). Phase 3 is planned in
+[plans/2026-11-24-rust-port-phase3.md](plans/2026-11-24-rust-port-phase3.md), with its verified core
+spiked. Phases 2 and 4 are not started. Phase 1 has a
 task plan in [plans/2026-11-24-rust-port-phase1.md](plans/2026-11-24-rust-port-phase1.md).
 
 ## Goal
@@ -128,6 +130,22 @@ ffmpeg → ffprobe verify → hard-link publish.
    each.
 9. **Shipping builds use stock stable Rust.** Verus runs in CI and in
    `scripts/verus.sh`, never in `cargo build`.
+10. **The core's public API is total.** Verus checks `requires` only for
+    verified callers, and the `minicut` app crate is ordinary Rust. So a
+    precondition on a function the app can call is silently unchecked.
+    Every `pub fn` in `minicut-core` therefore has no `requires` and
+    reports failure as `Option`. Functions that need a precondition are
+    `pub(crate)` behind a checked wrapper (e.g. `try_label`). Enforced by
+    `scripts/check_core_api.py` (Phase 3, Task 3.1). Today it flags
+    `label` and `atempo_stages`; the app calls neither yet.
+11. **Training-data policy stays in Python.** The freeze rules (held-out
+    templates, reserved fixture, eval collisions) live where they are
+    already implemented and reviewed. Rust produces meaning; a Python
+    gate may only drop rows, never change them.
+12. **Templates are the review surface.** No proof can say that a phrase
+    means an intent. Each template is reviewed once, with its intent kind
+    and applicability rule, in a generated `docs/templates.md`, instead
+    of auditing thousands of labels.
 
 ## What is proved, and what is trusted
 
@@ -157,7 +175,9 @@ Phase 2 targets: argv structure per tool (e.g. trim emits `-ss start
 -to end` from the same ms values), the publish name sequence being
 injective and never equal to a source name, and concat ordering.
 
-Trusted base (not proved; tested instead): ffmpeg/ffprobe behaviour;
+Trusted base (not proved; tested instead): template wording → intent
+(human-reviewed); digit printing in `render.rs` (exhaustive round-trip
+over 0–3,600,000 ms); the SplitMix64 RNG; ffmpeg/ffprobe behaviour;
 parsing ffprobe JSON; the OS `link()` refusing to replace an existing
 name; serde_json; the f64→ms/per-mille rounding in `wire`; path safety
 checks on strings; the llama.cpp client; Verus and Z3 themselves.
@@ -190,13 +210,22 @@ is the Rust binary (38/38 expected outcomes, all wrong-but-executable
 and tampering controls caught), 200/200 dev oracle cases, and
 `tests/test_cli.py` / `tests/test_wrapper.py` pass against the binary.
 
-**Phase 3: verified label generation (3–5 days).** Intent sampler and
-NL templates in Rust (`minicut label --seed N --out FILE.jsonl`), with
-labels produced only by the proved `label()` / `missing()`. Python
-`training/` consumes the JSONL unchanged in format. Acceptance: the
-generated corpus passes every `build_pilot.py` filter with zero drops,
-and all targets pass llama.cpp `test-gbnf-validator` with the
-committed grammar.
+**Phase 3: verified label generation (3–5 days).** Planned in
+[plans/2026-11-24-rust-port-phase3.md](plans/2026-11-24-rust-port-phase3.md).
+Can land before Phase 2; from Phase 2's scope it needs only
+`default_output`.
+- An intent sampler plus a reviewed template table renders the request.
+  The label comes only from the proved `try_label` / `missing` /
+  `pct_of` / `scale_half` / `scale_quarter` / speed functions.
+- A drop-only Python freeze gate applies the eval policy.
+- Rows keep the pilot's exact format, so `training/` consumes them
+  unchanged.
+- Acceptance: zero `build_pilot` filter drops; 100% `validate.py`;
+  100% llama.cpp grammar parse; tokenizer preflight; the Rust
+  `kept_intervals` agrees with the release grader's
+  `expected_timeline` on every trim/cut_out case.
+- Exit experiment: a matched-size pilot on the verified set, against
+  pilot v1 on the 200 development cases.
 
 **Phase 4: cutover (1 day).** Re-baseline stock and pilot adapter
 under the new grammar with the Rust binary. Move `colour_at`/`tone_at`

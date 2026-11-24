@@ -1,5 +1,11 @@
 # MiniCut progress
 
+## Rust port, Phase 3: verified training labels (planned)
+
+- Plan: [docs/plans/2026-11-24-rust-port-phase3.md](docs/plans/2026-11-24-rust-port-phase3.md). Meaning first: a sampled intent is rendered through a reviewed template table, and the label comes only from the proved `try_label`. A Python freeze gate drops but never edits. Rows keep the pilot format.
+- Verified core spiked (not committed): `try_label`, `pct_of`, `scale_half`/`scale_quarter`, speed percentages, `to_secs` and `kept_intervals`. 35 verified, 0 errors under 10 SMT seeds; 10/10 data-generation mutants killed; passes on stock Rust 1.99. A core rebuilt only from the plan's code blocks gives the same result.
+- Found while spiking: (1) Verus does not enforce `requires` on unverified callers, so the core's public API must be total. `scripts/check_core_api.py` flags `label` and `atempo_stages` on this branch (latent; the app calls neither); this is Task 3.1. (2) A variable-divisor scale proof passed seeds 0, 2 and 3 and failed 1 and 7, so the stability check widens to seeds 0–9. (3) Existing wording traps: `trim_t4` "cut X down to" means keep; "the middle" is false when start = 0; v1 labelled "trim the first 25%" as keep-first.
+
 ## Rust port, Phases 0–1: verified core + `grammar`/`validate` (branch `rust-port`)
 
 - State: implemented and independently reviewed (spec PASS; quality APPROVED; proof-soundness review found unconstrained `kept_ms` arms and a position-blind label spec, both fixed below). Not merged. The Python tool is still the shipped one; no Python file changed.
