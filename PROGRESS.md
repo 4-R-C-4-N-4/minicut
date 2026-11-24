@@ -1,5 +1,11 @@
 # MiniCut progress
 
+## Rust port with a Verus-verified core (proposed)
+
+- Direction: ship `minicut` as a Rust binary whose core (validate, edit meaning, intent→label, clock, atempo, clarify `missing`) is proved with Verus/Z3. Training and eval stay Python. Contract: [docs/rust-port.md](docs/rust-port.md). Phase 0–1 tasks: [docs/plans/2026-11-24-rust-port-phase1.md](docs/plans/2026-11-24-rust-port-phase1.md).
+- Feasibility checked on this machine with Verus `0.2026.11.22.1ce6a59` (rustup 1.100.0, check-time only). Prototype core: 16 verified, 0 errors; 8/8 planted bugs rejected (keep/remove inversion, mm:ss fraction loss, clarify listing provided args, ...). Builds and tests with stock Rust 1.99. Grammar emitter matches PR #3's llama.cpp-validated grammar; parity with `validate.py` on 20,000 sampled calls: 0 mismatches.
+- PR #3 review: its grammar half is solid (1262/1262 targets accepted by llama.cpp's validator). Its Dafny file proves the spec consistent but nothing executes it, and the Rust core supersedes it. No code from this direction is committed yet.
+
 ## CLI with stock model
 
 - `minicut REQUEST FILE...` (`minicut/cli.py`, packaged as a console script): asks local llama.cpp for one tool call, binds it to the given files, validates against ffprobe, then renders one verified derivative, or previews with `--preview`. `--output-dir`, `--json`, exit codes in README. The model client is shared with the dev eval (`minicut/llm/client.py`).
