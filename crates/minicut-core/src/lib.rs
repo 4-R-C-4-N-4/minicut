@@ -203,7 +203,7 @@ pub open spec fn is_keep(i: Intent) -> bool {
     }
 }
 
-pub fn label(i: Intent, c: Clip) -> (e: Edit)
+pub(crate) fn label(i: Intent, c: Clip) -> (e: Edit)
     requires
         match i {
             Intent::KeepLast { ms } => ms <= c.duration_ms,
@@ -240,7 +240,7 @@ pub fn to_clock(ms: u64) -> (r: (u64, u64, u64))
 // ffmpeg atempo takes 0.5..2.0 per stage here; 0.25..4.0 needs <= 2 stages.
 pub open spec fn stage_ok(s: u64) -> bool { 500 <= s <= 2000 }
 
-pub fn atempo_stages(f: u64) -> (r: (u64, Option<u64>))
+pub(crate) fn atempo_stages(f: u64) -> (r: (u64, Option<u64>))
     requires 250 <= f <= 4000
     ensures
         stage_ok(r.0),
@@ -257,6 +257,20 @@ pub fn atempo_stages(f: u64) -> (r: (u64, Option<u64>))
     } else {
         (f, None)
     }
+}
+
+/// Total entry point for the app: None outside the validator's 0.25x..4x.
+pub fn try_atempo(f: u64) -> (r: Option<(u64, Option<u64>)>)
+    ensures
+        match r {
+            Some(st) => 250 <= f <= 4000 && stage_ok(st.0) && match st.1 {
+                None => st.0 == f,
+                Some(s2) => stage_ok(s2) && st.0 * s2 <= f * 1000 && f * 1000 <= st.0 * s2 + 1000,
+            },
+            None => !(250 <= f <= 4000),
+        },
+{
+    if 250 <= f && f <= 4000 { Some(atempo_stages(f)) } else { None }
 }
 
 // --------------------------------------------- clarify: missing is computed --
