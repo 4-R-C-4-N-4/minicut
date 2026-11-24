@@ -169,4 +169,27 @@ pub fn to_clock(ms: u64) -> (r: (u64, u64, u64))
     (ms / 60000, rem / 1000, rem % 1000)
 }
 
+// ------------------------------------------------------- atempo chain ------
+// ffmpeg atempo takes 0.5..2.0 per stage here; 0.25..4.0 needs <= 2 stages.
+pub open spec fn stage_ok(s: u64) -> bool { 500 <= s <= 2000 }
+
+pub fn atempo_stages(f: u64) -> (r: (u64, Option<u64>))
+    requires 250 <= f <= 4000
+    ensures
+        stage_ok(r.0),
+        match r.1 {
+            None => r.0 == f,
+            // product of stages, in per-mille^2, is within 0.001x of f
+            Some(s2) => stage_ok(s2) && r.0 * s2 <= f * 1000 && f * 1000 <= r.0 * s2 + 1000,
+        },
+{
+    if f > 2000 {
+        (2000, Some(f / 2))
+    } else if f < 500 {
+        (500, Some(f * 2))
+    } else {
+        (f, None)
+    }
+}
+
 } // verus!
