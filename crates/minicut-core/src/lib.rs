@@ -240,3 +240,23 @@ pub fn missing(k: Kind, provided: u16) -> (m: u16)
 }
 
 } // verus!
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runs_on_stock_rust() {
+        let c = Clip { duration_ms: 30000, width: Some(1280), height: Some(720), has_audio: true };
+        assert!(validate(label(Intent::RemoveFirst { ms: 10000 }, c), c));
+        assert!(!validate(Edit::Speed { factor_pm: 1000 }, c));
+        assert!(!validate(Edit::Trim { start_ms: 0, end_ms: 30000 }, c));
+        assert!(!validate(Edit::Scale { width: 1280, height: 720 }, c));
+        assert_eq!(atempo_stages(4000), (2000, Some(2000)));
+        assert_eq!(atempo_stages(250), (500, Some(500)));
+        assert_eq!(atempo_stages(1250), (1250, None));
+        assert_eq!(to_clock(72500), (1, 12, 500));
+        assert_eq!(missing(Kind::Trim, 0b1), 0b110);
+        assert_eq!(missing(Kind::Convert, 0b1), 0b0110000000);
+    }
+}
