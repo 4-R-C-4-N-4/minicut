@@ -1,9 +1,10 @@
 mod grammar;
+mod templates;
 mod wire;
 
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: minicut grammar | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl";
+const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl";
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter()
@@ -15,6 +16,10 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(|s| s.as_str()) {
+        Some("templates") if args.iter().any(|a| a == "--markdown") => {
+            print!("{}", templates::markdown());
+            ExitCode::SUCCESS
+        }
         Some("grammar") => {
             print!("{}", grammar::gbnf());
             ExitCode::SUCCESS

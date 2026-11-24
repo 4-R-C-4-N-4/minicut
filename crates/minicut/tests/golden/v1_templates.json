@@ -1,0 +1,258 @@
+{
+ "concat_t1": [
+  "join clip.mp4 to itself",
+  "join clip.mp4 to itself three times"
+ ],
+ "concat_t2": [
+  "make one video from clip.mp4 three times in a row",
+  "make one video from clip.mp4 twice"
+ ],
+ "concat_t3": [
+  "concatenate clip.mp4 with itself"
+ ],
+ "concat_t4": [
+  "combine clip.mp4 with itself into one file"
+ ],
+ "convert_t1": [
+  "convert clip.mp4 to mkv with libx264"
+ ],
+ "convert_t2": [
+  "re-encode clip.mp4 as libx264 in a .mkv file"
+ ],
+ "convert_t3": [
+  "save clip.mp4 as mkv using libx264"
+ ],
+ "cut_t1": [
+  "cut the first 222 seconds off clip.mp4",
+  "remove 111 to 222 seconds from clip.mp4"
+ ],
+ "cut_t2": [
+  "remove 0 to 222 seconds from clip.mp4",
+  "remove 111 to 222 seconds from clip.mp4"
+ ],
+ "cut_t3": [
+  "cut out 0-222 from clip.mp4",
+  "cut out 111-222 from clip.mp4"
+ ],
+ "cut_t4": [
+  "delete the middle 0 to 222 seconds of clip.mp4",
+  "delete the middle 111 to 222 seconds of clip.mp4"
+ ],
+ "cut_t5": [
+  "drop seconds 0 through 222 of clip.mp4",
+  "drop seconds 111 through 222 of clip.mp4"
+ ],
+ "extract_t1": [
+  "extract the audio from clip.mp4 as mp3"
+ ],
+ "extract_t2": [
+  "save the audio from clip.mp4 to mp3"
+ ],
+ "extract_t3": [
+  "pull the soundtrack out of clip.mp4 as an mp3 file"
+ ],
+ "mute_t1": [
+  "mute clip.mp4"
+ ],
+ "mute_t2": [
+  "remove the audio from clip.mp4"
+ ],
+ "mute_t3": [
+  "make a silent version of clip.mp4"
+ ],
+ "mute_t4": [
+  "drop the audio track from clip.mp4"
+ ],
+ "scale_t1": [
+  "make clip.mp4 1280x720",
+  "make clip.mp4 1920x1080",
+  "make clip.mp4 333x444",
+  "make clip.mp4 960x540"
+ ],
+ "scale_t2": [
+  "resize clip.mp4 to 1280 by 720",
+  "resize clip.mp4 to 1920 by 1080",
+  "resize clip.mp4 to 333 by 444",
+  "resize clip.mp4 to 960 by 540"
+ ],
+ "scale_t3": [
+  "resize clip.mp4 to 1920x1080",
+  "resize clip.mp4 to 333x444",
+  "resize clip.mp4 to 960x540",
+  "scale clip.mp4 to 720p"
+ ],
+ "scale_t4": [
+  "make clip.mp4 1280x720",
+  "make clip.mp4 1920x1080",
+  "make clip.mp4 333x444",
+  "make clip.mp4 960x540"
+ ],
+ "speed_t1": [
+  "slow clip.mp4 down to 0.8x",
+  "speed up clip.mp4 by 1.25x"
+ ],
+ "speed_t2": [
+  "make clip.mp4 1.25 times as fast",
+  "play clip.mp4 at 0.8x speed"
+ ],
+ "speed_t3": [
+  "speed clip.mp4 up to 0.8x",
+  "speed clip.mp4 up to 1.25x"
+ ],
+ "speed_t4": [
+  "run clip.mp4 at 0.8x speed",
+  "run clip.mp4 at 1.25x speed"
+ ],
+ "train_concat_x1": [
+  "put three copies of clip.mp4 together",
+  "put two copies of clip.mp4 together"
+ ],
+ "train_concat_x2": [
+  "merge clip.mp4 with itself"
+ ],
+ "train_concat_x3": [
+  "append clip.mp4 to itself"
+ ],
+ "train_concat_x4": [
+  "loop clip.mp4 three times",
+  "loop clip.mp4 twice"
+ ],
+ "train_concat_x5": [
+  "make a video with clip.mp4 three times in a row",
+  "make a video with clip.mp4 twice in a row"
+ ],
+ "train_convert_x1": [
+  "save clip.mp4 as a .mkv file with libx264"
+ ],
+ "train_convert_x2": [
+  "change clip.mp4 to mkv format using libx264"
+ ],
+ "train_cut_x1": [
+  "take out 0 to 222 seconds from clip.mp4",
+  "take out 111 to 222 seconds from clip.mp4"
+ ],
+ "train_cut_x2": [
+  "delete seconds 0 through 222 from clip.mp4",
+  "delete seconds 111 through 222 from clip.mp4"
+ ],
+ "train_cut_x3": [
+  "cut the section from 0 to 222 seconds out of clip.mp4",
+  "cut the section from 111 to 222 seconds out of clip.mp4"
+ ],
+ "train_cut_x4": [
+  "remove the middle 0 to 222 seconds from clip.mp4",
+  "remove the middle 111 to 222 seconds from clip.mp4"
+ ],
+ "train_extract_x1": [
+  "get the mp3 from clip.mp4"
+ ],
+ "train_extract_x10": [
+  "turn clip.mp4 into an mp3"
+ ],
+ "train_extract_x2": [
+  "rip the mp3 out of clip.mp4"
+ ],
+ "train_extract_x3": [
+  "save clip.mp4's audio as mp3"
+ ],
+ "train_extract_x4": [
+  "export the soundtrack as mp3"
+ ],
+ "train_extract_x5": [
+  "make an mp3 from clip.mp4"
+ ],
+ "train_extract_x6": [
+  "pull the mp3 from clip.mp4"
+ ],
+ "train_extract_x7": [
+  "audio only from clip.mp4 as mp3"
+ ],
+ "train_extract_x8": [
+  "isolate the audio in clip.mp4 as mp3"
+ ],
+ "train_extract_x9": [
+  "grab the audio from clip.mp4 in mp3"
+ ],
+ "train_mute_x1": [
+  "silence the audio in clip.mp4"
+ ],
+ "train_mute_x10": [
+  "drop all audio from clip.mp4"
+ ],
+ "train_mute_x2": [
+  "make clip.mp4 silent"
+ ],
+ "train_mute_x3": [
+  "turn off the sound in clip.mp4"
+ ],
+ "train_mute_x4": [
+  "remove all sound from clip.mp4"
+ ],
+ "train_mute_x5": [
+  "drop the sound from clip.mp4"
+ ],
+ "train_mute_x6": [
+  "make clip.mp4 quiet"
+ ],
+ "train_mute_x7": [
+  "strip the audio track from clip.mp4"
+ ],
+ "train_mute_x8": [
+  "remove the audio track from clip.mp4"
+ ],
+ "train_mute_x9": [
+  "kill the audio in clip.mp4"
+ ],
+ "train_scale_x1": [
+  "scale clip.mp4 down to 333x444",
+  "scale clip.mp4 down to 960x540",
+  "scale clip.mp4 up to 1280x720",
+  "scale clip.mp4 up to 1920x1080"
+ ],
+ "train_scale_x2": [
+  "make clip.mp4 540p",
+  "resize clip.mp4 to 1280x720",
+  "resize clip.mp4 to 1920x1080",
+  "resize clip.mp4 to 333x444"
+ ],
+ "train_speed_x1": [
+  "make clip.mp4 25% faster",
+  "slow clip.mp4 to 80% speed"
+ ],
+ "train_speed_x2": [
+  "change clip.mp4 to play at 0.8x",
+  "change clip.mp4 to play at 1.25x"
+ ],
+ "train_trim_x1": [
+  "trim clip.mp4 from 0s to 222s",
+  "trim clip.mp4 from 111s to 222s"
+ ],
+ "train_trim_x2": [
+  "cut clip.mp4 to 0-222",
+  "cut clip.mp4 to 111-222"
+ ],
+ "train_trim_x3": [
+  "keep the 0 to 222 second part of clip.mp4",
+  "keep the 111 to 222 second part of clip.mp4"
+ ],
+ "trim_t1": [
+  "trim clip.mp4 from 0 seconds to 222 seconds",
+  "trim clip.mp4 from 111 seconds to 222 seconds"
+ ],
+ "trim_t2": [
+  "trim clip.mp4 from 0:00 to 3:42",
+  "trim clip.mp4 from 1:51 to 3:42"
+ ],
+ "trim_t3": [
+  "keep only 0 to 222 seconds of clip.mp4",
+  "keep only 111 to 222 seconds of clip.mp4"
+ ],
+ "trim_t4": [
+  "cut clip.mp4 down to 0-222 seconds",
+  "cut clip.mp4 down to 111-222 seconds"
+ ],
+ "trim_t5": [
+  "trim clip.mp4 from 111 to 222",
+  "trim clip.mp4 to the first 222 seconds"
+ ]
+}
