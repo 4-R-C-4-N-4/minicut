@@ -88,14 +88,30 @@ rows.jsonl + meta.jsonl ──► training/build_verified.py (freeze gate, drop-
    In the spike, a version of `scale_by_div` passed seeds 0, 2 and 3 and failed 1 and 7.
 10. **P3-D10 Phase order.** Phase 3 can land before Phase 2. From Phase 2's scope it needs only
     `default_output` (Task 3.13).
+11. **P3-D11 Ambiguous requests are rejected with a clarify that suggests our own vocabulary** (Ivy,
+    2026-11-24; this replaces "exclude ambiguous phrasings"). Never a guessed label. Two classes:
+    - **Reading-ambiguous:** every argument is present but the operation is not, e.g. "trim the first 25%
+      of clip.mp4". The label is `clarify` with `missing: []`, which is what the proved `missing` gives
+      when both readings are fully specified. The question offers both readings as canonical phrasings
+      with the user's own numbers: *"Do you want to keep only the first 7.5 seconds of clip.mp4, or cut
+      the first 7.5 seconds off?"* The second reading comes from the proved `flip`, and
+      `readings_disagree` proves the two readings disagree at every instant of every clip.
+    - **Argument-missing:** the existing class, e.g. "cut clip.mp4". `missing` comes from the proved
+      `missing()`, and the question suggests a canonical phrasing for each candidate tool: *"What should
+      I do with clip.mp4: keep only a part (e.g. "keep only 5 to 12 seconds") or remove a part (e.g. "cut
+      out 5 to 12 seconds")? Tell me the start and end."*
+    - Suggestions come from a **vocabulary table**: one canonical phrasing per intent kind, each of which
+      must itself render through an unambiguous template of that kind (test). Graders compare only
+      `missing` (`eval/run_eval.py:_args_correct`, `eval/release/bench.py`), so the question text is free
+      to carry suggestions without changing any score.
 
 ## Open questions (default in brackets)
 
-1. "trim the first 25%" / "trim the last half": keep-first or remove-first? [Exclude from the table; list
-   under "excluded". Teaching it as a clarify is a later, separate experiment.]
-2. Row counts. [Match the pilot's tool mix: trim 306, cut_out 368, concat 223, scale 255, speed 300,
-   convert 193, extract_audio 244, mute 120, clarify 310 (2,319 total). Same size, so a matched comparison
-   isolates label quality.]
+1. ~~"trim the first 25%": exclude?~~ **Resolved (P3-D11):** reading-ambiguous wording becomes a clarify
+   row offering both readings in our vocabulary.
+2. Row counts. [Match the pilot's tool mix and size: trim 306, cut_out 368, concat 223, scale 255, speed
+   300, convert 193, extract_audio 244, mute 120, clarify 310 (2,319 total). The clarify 310 splits into 250
+   argument-missing and 60 reading-ambiguous (P3-D11).]
 3. Eval-pool disjointness in the sampler or only in the gate? [Gate only, per P3-D3. If the gate drops more
    than 20% of any tool, export the pools from `eval/freeze.json` as a sampler input file.]
 4. Keep `output` in targets? [Yes, as P3-D6. The grammar allows it, the few-shot examples show it, and the
@@ -115,7 +131,7 @@ rows.jsonl + meta.jsonl ──► training/build_verified.py (freeze gate, drop-
 
 - `scripts/verus.sh` → ≥ 35 verified, 0 errors.
 - `scripts/check_core_api.py` → exit 0.
-- `scripts/mutate_core.sh` → stable under seeds 0–9, all mutants (22) killed.
+- `scripts/mutate_core.sh` → stable under seeds 0–9, all mutants (24) killed.
 - `cargo test --workspace`, `cargo fmt --check` → pass; the exhaustive render round-trip passes.
 - `minicut label --seed 20261124 …` → rows; `training/build_verified.py` → drop counts recorded,
   no row modified.
@@ -451,6 +467,13 @@ pub fn kept_intervals(e: Edit, c: Clip) -> (r: Option<(Option<(u64, u64)>, Optio
 witnesses. The fixed two-slot result states the same thing without `exists`. → 0 errors.
 **Commit:** `core: kept_intervals proved equal to survives`
 
+### Task 3.8b: ambiguity, the other reading (added with P3-D11; landed)
+
+`flip_spec` / `flip` (total) return the other keep/remove reading of the same span. The proof fn
+`readings_disagree` shows `intent_survives(i, c, t) == !intent_survives(flip_spec(i), c, t)` for every t
+and every clip. Two mutants (the other reading of "first N" taken as "last N"; flip returning the same
+reading) are killed.
+
 ### Task 3.9: mutants and seeds
 
 **Files:** `scripts/mutate_core.sh`. Change the stability loop to `for seed in 0 1 2 3 4 5 6 7 8 9`. Add these
@@ -566,8 +589,14 @@ plus the scale/speed/convert/extract/mute/concat train and extra pools. Each row
 - `trim_t4` / `train_trim_x2` ("cut X down to / cut X to a-b") → KeepRange, note "verb 'cut' + 'down to' = keep".
 - `cut_t4` / `train_cut_x4` ("the middle a to b") → RemoveRange, applies only when 0 < a and b < duration.
 - `trim_t5` with start = 0 → KeepFirst; `cut_t1` with start = 0 → RemoveFirst.
-- **Excluded**, listed in `docs/templates.md` with the reason: "trim the {first,last} {pct}%" and
-  "trim the {first,last} half" (keep or remove is genuinely ambiguous, open question 1).
+- **Ambiguous table** (P3-D11), a separate `AMBIGUOUS` list, never used for tool rows: "trim the
+  {first,last} {pct}%", "trim the {first,last} half" and "cut {file} to the first {a}" (the verb flips the
+  meaning). Each row names the intent kind of its first reading; the second is `flip(first)`. Rows render
+  as clarify with `missing: []` and a two-suggestion question from the vocabulary table.
+- **Vocabulary table** `VOCAB: [(IntentKind, &str)]`: one canonical phrasing per kind, e.g. KeepFirst →
+  "keep only the first {a}", RemoveFirst → "cut the first {a} off", KeepRange → "keep only {a} to {b}",
+  RemoveRange → "cut out {a} to {b}". Test: each VOCAB phrasing equals the text of some non-ambiguous
+  template of the same kind.
 
 Tests:
 - `docs/templates.md` equals the `minicut templates --markdown` output;
@@ -584,10 +613,12 @@ Tests:
 - `ClarifyIntent { kind: Kind, provided: u16 }`, with the input bit always set because the app binds files.
 - `missing` comes from `minicut_core::missing` and is mapped to names in bit order
   (`["start","end"]`, `["width","height"]`, `["codec","container"]`, …).
-- The request wordings come from `CLARIFY_AMBIG`, each assigned an explicit `Kind`. "cut clip.mp4" is listed
-  as ambiguous between Trim and CutOut, so it is excluded or gets a neutral question; the reviewer decides in
-  the table.
-- Question text is keyed by (kind, missing).
+- The request wordings come from `CLARIFY_AMBIG`. Each is assigned the *set* of candidate kinds it could
+  mean: "trim clip.mp4" → {Trim}; "cut clip.mp4" → {Trim, CutOut}.
+- Question text: one sentence naming the missing arguments, plus one VOCAB suggestion per candidate kind
+  (P3-D11). A test asserts every clarify question contains at least one VOCAB phrasing.
+- Reading-ambiguous rows (Task 3.15 `AMBIGUOUS`) are built here too: `missing: []`, with a question
+  rendering `VOCAB[kind(i)]` and `VOCAB[kind(flip(i))]` with the user's numbers.
 
 Test: for every kind and provided-subset, the names equal required − provided.
 **Commit:** `minicut: clarify rows with computed missing lists`

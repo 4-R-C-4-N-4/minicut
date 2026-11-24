@@ -1,6 +1,12 @@
 # MiniCut progress
 
-## Rust port, Phase 3: verified training labels (planned)
+## Rust port, Phase 3: verified training labels (in progress, branch `phase3-labels`)
+
+- Core landed (Tasks 3.1–3.10 + 3.8b): the core's public API is total (`check_core_api.py` in CI), plus `try_label`, `pct_of`, `scale_half`/`scale_quarter`, speed percentages, `to_secs`, `kept_intervals`, `flip`/`readings_disagree`. `scripts/verus.sh` → 38 verified, 0 errors; `scripts/mutate_core.sh` → stable under seeds 0–9, 24/24 killed.
+- New rule (Ivy): ambiguous requests are rejected with a clarify that suggests our own phrasings (plan P3-D11). Graders compare only `missing`, so no schema change is needed.
+- Next: app side (rng/render/naming/prompts, freeze gate + acceptance, template + vocabulary + clarify tables, `minicut label`).
+
+## Rust port, Phase 3: plan notes
 
 - Plan: [docs/plans/2026-11-24-rust-port-phase3.md](docs/plans/2026-11-24-rust-port-phase3.md). Meaning first: a sampled intent is rendered through a reviewed template table, and the label comes only from the proved `try_label`. A Python freeze gate drops but never edits. Rows keep the pilot format.
 - Verified core spiked (not committed): `try_label`, `pct_of`, `scale_half`/`scale_quarter`, speed percentages, `to_secs` and `kept_intervals`. 35 verified, 0 errors under 10 SMT seeds; 10/10 data-generation mutants killed; passes on stock Rust 1.99. A core rebuilt only from the plan's code blocks gives the same result.

@@ -148,6 +148,13 @@ ffmpeg → ffprobe verify → hard-link publish.
     means an intent. Each template is reviewed once, with its intent kind
     and applicability rule, in a generated `docs/templates.md`, instead
     of auditing thousands of labels.
+13. **Ambiguous requests are rejected with a clarify, never guessed**
+    (Ivy). The question suggests MiniCut's own canonical phrasings ("keep
+    only …" / "cut … off"). Graders compare only `missing`, so the
+    suggestions live in the question text. A fully specified but
+    ambiguous reading uses `missing: []`. The core proves (`flip`,
+    `readings_disagree`) that the two keep/remove readings of a span
+    disagree at every instant.
 
 ## What is proved, and what is trusted
 
