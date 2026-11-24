@@ -192,4 +192,51 @@ pub fn atempo_stages(f: u64) -> (r: (u64, Option<u64>))
     }
 }
 
+// --------------------------------------------- clarify: missing is computed --
+// Arg bits: 0 input, 1 start, 2 end, 3 inputs, 4 width, 5 height, 6 factor,
+// 7 codec, 8 container, 9 format.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Kind { Trim, CutOut, Concat, Scale, Speed, Convert, ExtractAudio, Mute }
+
+pub open spec fn required_spec(k: Kind) -> u16 {
+    match k {
+        Kind::Trim => 0b0000000111,
+        Kind::CutOut => 0b0000000111,
+        Kind::Concat => 0b0000001000,
+        Kind::Scale => 0b0000110001,
+        Kind::Speed => 0b0001000001,
+        Kind::Convert => 0b0110000001,
+        Kind::ExtractAudio => 0b1000000001,
+        Kind::Mute => 0b0000000001,
+    }
+}
+
+pub fn required(k: Kind) -> (r: u16)
+    ensures r == required_spec(k)
+{
+    match k {
+        Kind::Trim => 0b0000000111,
+        Kind::CutOut => 0b0000000111,
+        Kind::Concat => 0b0000001000,
+        Kind::Scale => 0b0000110001,
+        Kind::Speed => 0b0001000001,
+        Kind::Convert => 0b0110000001,
+        Kind::ExtractAudio => 0b1000000001,
+        Kind::Mute => 0b0000000001,
+    }
+}
+
+pub fn missing(k: Kind, provided: u16) -> (m: u16)
+    ensures
+        forall|b: u16| #![auto] b < 16 ==>
+            ((m >> b) & 1 == 1 <==> ((required_spec(k) >> b) & 1 == 1 && (provided >> b) & 1 == 0)),
+{
+    let r = required(k);
+    let m = r & !provided;
+    assert(forall|b: u16| #![auto] b < 16 ==>
+        (((r & !provided) >> b) & 1 == 1 <==> ((r >> b) & 1 == 1 && (provided >> b) & 1 == 0)))
+        by (bit_vector);
+    m
+}
+
 } // verus!
