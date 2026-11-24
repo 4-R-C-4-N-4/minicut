@@ -1,8 +1,8 @@
 # MiniCut in Rust, with a Verus-verified core
 
-Status: Phases 0–1 implemented on branch `rust-port` (2026-11-24). Phase 3 is planned in
-[plans/2026-11-24-rust-port-phase3.md](plans/2026-11-24-rust-port-phase3.md), with its verified core
-spiked. Phases 2 and 4 are not started. Phase 1 has a
+Status: Phases 0–1 merged (PR #4). Phase 3 implemented on branch `phase3-labels`
+(`training/train_verified_v1.jsonl`, all acceptance checks pass); its GPU exit experiment has not run.
+Phases 2 and 4 are not started. Phase 1 has a
 task plan in [plans/2026-11-24-rust-port-phase1.md](plans/2026-11-24-rust-port-phase1.md).
 
 ## Goal

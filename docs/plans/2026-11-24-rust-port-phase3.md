@@ -105,6 +105,21 @@ rows.jsonl + meta.jsonl ──► training/build_verified.py (freeze gate, drop-
       `missing` (`eval/run_eval.py:_args_correct`, `eval/release/bench.py`), so the question text is free
       to carry suggestions without changing any score.
 
+12. **P3-D12 Labels must follow from the text alone** (found while landing). The model sees only the
+    request (`cli.compose_prompt`), never the probe. Last-N, percentage and relative-size labels are
+    *correct* but need the clip's duration or size, so the same text would carry different labels on
+    different clips. `Template::needs_probe()` marks them; tool rows never use them. Ambiguity questions
+    repeat the user's terms (a percentage stays a percentage). Their proofs stay, for a future
+    intent-level output that the app resolves against the probe.
+13. **P3-D13 Matched size via oversample + targets.** The gate applies every freeze drop, then keeps the
+    first N rows per tool (`training/verified_targets.json`) and fails if any tool is short. Freeze rules
+    stay in Python. The combo-pool rule (`eval/freeze.json`) was missing from the original gate brief and
+    is now enforced.
+14. **P3-D14 v1 heuristics are not waived, they are re-proved per row.** `build_pilot`'s `mmss_fraction`
+    and `scale_dims_not_in_prompt` exist because v1's renderer lost information. The acceptance check
+    exempts a row only when a per-row check shows the prompt states the label (clock text round-trips to
+    start/end; "540p" == 960x540), and it names every exemption.
+
 ## Open questions (default in brackets)
 
 1. ~~"trim the first 25%": exclude?~~ **Resolved (P3-D11):** reading-ambiguous wording becomes a clarify

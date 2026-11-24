@@ -1,10 +1,18 @@
 # MiniCut progress
 
-## Rust port, Phase 3: verified training labels (in progress, branch `phase3-labels`)
+## Rust port, Phase 3: verified training labels (implemented on `phase3-labels`; review pending; GPU experiment not run)
 
-- Core landed (Tasks 3.1–3.10 + 3.8b): the core's public API is total (`check_core_api.py` in CI), plus `try_label`, `pct_of`, `scale_half`/`scale_quarter`, speed percentages, `to_secs`, `kept_intervals`, `flip`/`readings_disagree`. `scripts/verus.sh` → 38 verified, 0 errors; `scripts/mutate_core.sh` → stable under seeds 0–9, 24/24 killed.
-- New rule (Ivy): ambiguous requests are rejected with a clarify that suggests our own phrasings (plan P3-D11). Graders compare only `missing`, so no schema change is needed.
-- Next: app side (rng/render/naming/prompts, freeze gate + acceptance, template + vocabulary + clarify tables, `minicut label`).
+- **Core:** the public API is total (`check_core_api.py` in CI), plus `try_label`, `pct_of`, `scale_half`/`scale_quarter`, speed percentages, `to_secs`, `kept_intervals`, `flip`/`readings_disagree`. `scripts/verus.sh` → 38 verified, 0 errors; `scripts/mutate_core.sh` → stable under seeds 0–9, 24/24 killed.
+- **Generator:** `minicut label` (intent-first rows) plus the reviewed tables in `docs/templates.md` (templates, ambiguous wording, vocabulary, clarify requests). Ambiguous requests become clarify rows that offer our phrasings (Ivy's rule, P3-D11).
+- **Dataset:** `training/train_verified_v1.jsonl` (2,319 rows, pilot-matched mix, SHA `b9f0e453…`; reproducible from debug and release builds). Freeze gate: 4,454 candidates → 2,319 (`training/train_verified_v1_stats.json`).
+- **Acceptance (all PASS):** pilot filters 0 drops (49 per-row-verified exemptions); `validate.py` 2,319/2,319; llama.cpp grammar parse 2,319/2,319; tokenizer preflight (max 645, min supervised 26); release-grader meaning 16/16.
+- **Found while landing:**
+  - Labels that are correct but need hidden clip facts (last-N, percentages, relative size): excluded from tool rows (P3-D12), guarded by a one-prompt-one-target test.
+  - The freeze gate lacked the combo-pool rule; added.
+  - The acceptance preflight could never pass (missing `--base`); fixed.
+  - Reused v1 ids `concat_t4` (word-for-word held-out `concat_h3`) and `train_scale_x1` (up/down by tuple order) corrected in the table.
+- **Python tests:** 86 passed. **Rust:** 0 warnings; `cargo test` green.
+- **Next:** the GPU exit experiment. Train a matched pilot on `train_verified_v1.jsonl` and board it against stock and pilot v1 on the 200 dev cases, with the same gate.
 
 ## Rust port, Phase 3: plan notes
 

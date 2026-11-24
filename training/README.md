@@ -198,6 +198,42 @@ comparison uses the same base and server for stock and final; the early adapter
 only runs the fixed training-corpus probe. `board` checks the saved 200-case
 rosters and paired totals without touching CUDA. The release set is not used.
 
+## Verified dataset v1 (`train_verified_v1.jsonl`)
+
+Same size and per-tool mix as `train_pilot_v1.jsonl`, so a matched pilot run isolates label
+quality. Labels come only from the Verus-verified core (`crates/minicut-core`). See
+`docs/plans/2026-11-24-rust-port-phase3.md` and the reviewed template table in `docs/templates.md`.
+
+```bash
+cargo build --release
+target/release/minicut label --seed 20261124 --oversample 100 \
+    --out "$TMPDIR/candidates.jsonl" --meta "$TMPDIR/candidates_meta.jsonl"
+python -m training.build_verified --rows "$TMPDIR/candidates.jsonl" \
+    --meta "$TMPDIR/candidates_meta.jsonl" --out training --targets training/verified_targets.json
+mv training/stats.json training/train_verified_v1_stats.json
+```
+
+- SHA-256 `b9f0e4531b75e8fe4bd1407e9b433a0983c46afba973f082bc00777e95edf736` (rows), `74a1ccc5…e09e1cf` (meta).
+  The same bytes come from a debug and a release build.
+- **Counts:** trim 306, cut_out 368, concat 223, scale 255, speed 300, convert 193, extract_audio 244,
+  mute 120, clarify 310. Clarify splits into 250 argument-missing rows (the `missing` list is computed by
+  the core; the question offers our phrasings) and 60 reading-ambiguous rows (`missing: []`; the question
+  offers both readings in the user's own terms).
+- **Freeze gate** (drop-only; `training/train_verified_v1_stats.json`): 4,454 candidates → 350
+  (template id, label) eval collisions, 72 combo-pool args, 21 (prompt, label) collisions, 4 eval prompts,
+  1,688 over target → 2,319 kept.
+- **Labels never need hidden clip facts.** Last-N, percentage and relative-size wordings need the clip's
+  duration or size, which the model never sees. Those templates are marked `probe` in `docs/templates.md`
+  and are not used for tool rows. A test checks across 3 full datasets that one prompt never maps to
+  two targets.
+- **Acceptance** (`scripts/accept_dataset.py`, all PASS):
+  - pilot filters: 0 drops; 49 rows exempt only by a per-row proof that the prompt states the label
+    (43 clock round-trips, 6 named sizes);
+  - `validate.py`: 2,319 / 2,319;
+  - llama.cpp `test-gbnf-validator` against `minicut grammar`: 2,319 / 2,319;
+  - tokenizer preflight: max 645 tokens, min supervised 26;
+  - release-grader meaning agreement: 16 / 16 trim/cut_out cases.
+
 ## Tests
 
 ```bash
