@@ -367,6 +367,35 @@ pub fn missing(k: Kind, provided: u16) -> (m: u16)
     m
 }
 
+// "the first 25%": a percentage renders only when it is an exact ms count.
+pub fn pct_of(duration_ms: u64, pct: u64) -> (r: Option<u64>)
+    ensures
+        match r {
+            Some(m) => pct <= 100 && m * 100 == duration_ms * pct,
+            None => pct > 100 || (duration_ms * pct) % 100 != 0,
+        },
+{
+    if pct > 100 {
+        return None;
+    }
+    proof {
+        assert((duration_ms as int) * (pct as int) <= (duration_ms as int) * 100) by (nonlinear_arith)
+            requires pct <= 100, duration_ms >= 0;
+    }
+    let p: u128 = duration_ms as u128 * pct as u128;
+    if p % 100 == 0 {
+        let m = p / 100;
+        proof {
+            assert(m * 100 == p);
+            assert(m <= duration_ms) by (nonlinear_arith)
+                requires m * 100 == p, p <= (duration_ms as int) * 100;
+        }
+        Some(m as u64)
+    } else {
+        None
+    }
+}
+
 } // verus!
 
 #[cfg(test)]
