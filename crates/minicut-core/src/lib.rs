@@ -253,6 +253,28 @@ pub open spec fn label_spec(i: Intent, c: Clip) -> Edit {
     }
 }
 
+pub fn try_label(i: Intent, c: Clip) -> (r: Option<Edit>)
+    ensures
+        match r {
+            Some(e) => labelable(i, c) && e == label_spec(i, c) && accepted(e, c)
+                && kept_ms(e, c) == intent_kept(i, c)
+                && (forall|t: int| 0 <= t < c.duration_ms ==> #[trigger] survives(e, t) == intent_survives(i, c, t))
+                && (is_keep(i) <==> (e is Trim)),
+            None => !labelable(i, c) || !accepted(label_spec(i, c), c),
+        },
+{
+    let ok = match i {
+        Intent::KeepLast { ms } => ms <= c.duration_ms,
+        Intent::RemoveLast { ms } => ms <= c.duration_ms,
+        _ => true,
+    };
+    if !ok {
+        return None;
+    }
+    let e = label(i, c);
+    if validate(e, c) { Some(e) } else { None }
+}
+
 // --------------------------------------------- clock rendering (mm:ss.fff) --
 pub fn to_clock(ms: u64) -> (r: (u64, u64, u64))
     ensures r.0 * 60000 + r.1 * 1000 + r.2 == ms, r.1 < 60, r.2 < 1000,
