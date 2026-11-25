@@ -385,14 +385,14 @@ mod tests {
     fn questions_carry_every_suggestion() {
         let r = REQUESTS.iter().find(|r| r.id == "v3_clar_cut").unwrap();
         let s = vec![
-            "keep only 5 to 12 seconds of clip.mp4".to_string(),
-            "remove 5 to 12 seconds from clip.mp4".to_string(),
+            "keep only START to END seconds of clip.mp4".to_string(),
+            "remove START to END seconds from clip.mp4".to_string(),
         ];
         let q = missing_question(r, "clip.mp4", &s);
         assert_eq!(
             q,
             "Do you want to keep only part of clip.mp4 or cut part of it out? Tell me the start and end times. \
-             For example: \"keep only 5 to 12 seconds of clip.mp4\" or \"remove 5 to 12 seconds from clip.mp4\"."
+             For example: \"keep only START to END seconds of clip.mp4\" or \"remove START to END seconds from clip.mp4\"."
         );
         assert_eq!(
             reading_question(

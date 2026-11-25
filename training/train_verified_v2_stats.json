@@ -1,0 +1,23 @@
+{
+  "input": 4454,
+  "kept": 2319,
+  "dropped_by_reason": {
+    "combo_arg_pool": 75,
+    "eval_prompt_canon_collision": 21,
+    "eval_prompt_collision": 4,
+    "eval_tid_canon_collision": 360,
+    "over_target": 1675
+  },
+  "kept_by_tool": {
+    "clarify": 310,
+    "concat": 223,
+    "convert": 193,
+    "cut_out": 368,
+    "extract_audio": 244,
+    "mute": 120,
+    "scale": 255,
+    "speed": 300,
+    "trim": 306
+  },
+  "short_of_target": {}
+}
