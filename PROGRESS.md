@@ -18,7 +18,8 @@
   - v1 data: 188–191, and a new keep/remove inversion at every seed (4/4).
   - verified data: 0 inversions (0/4) and 190–191, except one collapse at v2 seed 1 (175, 18 unnecessary "keep or remove?" clarifies on plain keep/remove requests).
   - No reliable score difference.
-- **Next:** pair each ambiguous-reading template with near-miss unambiguous rows ("cut the first N seconds off X" → cut_out), then re-run seeds 1–3; adopt verified data only if no seed collapses.
+- **Near-miss pairs (`train_verified_v3`):** each ambiguous clarify row ships with unambiguous partners (same file, same seconds), and the gate keeps partners only with their anchor. Seeds 1–3 gave 182 / 191 / 180, which **did not stabilise** (v2: 175 / 190 / 190). Every weak verified run flips the dev prompt "cut the first 10 seconds off clip.mp4" (4 dev cases) into a clarify. Verified data still has 0 new inversions in 7/7 runs.
+- **Next (decision):** drop the `v3_amb_cut_first` ("… of X") ambiguity, and/or ablate reading-ambiguous rows entirely, then re-sweep.
 
 ## Rust port, Phase 3: plan notes
 
