@@ -14,6 +14,20 @@ class TestTrainingFactory(unittest.TestCase):
                             '--grad-accum': '2'}.items():
             self.assertEqual(cmd[cmd.index(flag) + 1], value)
 
+    def test_default_data_keeps_the_v1_command_and_data_flag_is_passed(self):
+        cmd = training_command('python', Path('snapshot'), Path('run'), steps=100, seconds=900)
+        self.assertNotIn('--data', cmd)  # v1 pilot runs are reproduced unchanged
+        cmd = training_command('python', Path('snapshot'), Path('run'), steps=100, seconds=900,
+                               data=Path('training/train_verified_v1.jsonl'))
+        self.assertEqual(cmd[cmd.index('--data') + 1], 'training/train_verified_v1.jsonl')
+
+    def test_fit_roster_samples_the_given_dataset(self):
+        from training.evaluate_pilot import fit_roster
+        v1 = fit_roster()
+        verified = fit_roster(Path('training/train_verified_v1.jsonl'))
+        self.assertEqual(len(v1), 36)
+        self.assertNotEqual([r['prompt'] for r in v1], [r['prompt'] for r in verified])
+
     def test_incomplete_run_cannot_advance_to_export(self):
         with TemporaryDirectory() as path:
             with self.assertRaisesRegex(RuntimeError, 'completed adapter'):
