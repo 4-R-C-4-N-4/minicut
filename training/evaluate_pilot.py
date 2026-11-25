@@ -75,9 +75,9 @@ def collect(args, label, adapter, cases, fit):
                     process.wait()
 
 
-def fit_roster():
+def fit_roster(data=Path("training/train_pilot_v1.jsonl")):
     groups = defaultdict(list)
-    for i, row in enumerate(read_jsonl(Path("training/train_pilot_v1.jsonl")), 1):
+    for i, row in enumerate(read_jsonl(data), 1):
         messages = row["messages"]
         expected = json.loads(messages[-1]["content"])
         groups[expected["tool"]].append({"id": f"train-{i}", "prompt": messages[-2]["content"],
@@ -91,13 +91,15 @@ def main():
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--gguf", type=Path, required=True)
     parser.add_argument("--server", required=True)
+    parser.add_argument("--data", type=Path, default=Path("training/train_pilot_v1.jsonl"),
+                        help="training rows the fit probe samples from")
     args = parser.parse_args()
     assert os.environ.get("CUDA_DEVICE_ORDER") == "PCI_BUS_ID"
     devices = subprocess.check_output([args.server, "--list-devices"], text=True)
     assert devices.count("CUDA") == 1 and "RTX 3090" in devices, devices
     cases = [r for path in sorted(Path("eval").glob("eval_*.jsonl")) for r in read_jsonl(path)]
     assert len(cases) == len({r["id"] for r in cases}) == 200
-    fit = fit_roster()
+    fit = fit_roster(args.data)
     write_json(args.run / "fit-roster.json", fit)
     arms = [("stock", None, cases), ("early", args.run / "early.gguf", []),
             ("final", args.run / "final.gguf", cases)]

@@ -14,11 +14,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def training_command(python, base, run, *, steps, seconds):
-    return [str(python), '-m', 'training.train_lora', '--base', str(base),
-            '--out', str(run / 'adapter'), '--max-steps', str(steps),
-            '--max-seconds', str(seconds - 40), '--checkpoint-steps', str(steps // 4),
-            '--batch', '2', '--grad-accum', '2']
+DEFAULT_DATA = ROOT / 'training/train_pilot_v1.jsonl'
+
+
+def training_command(python, base, run, *, steps, seconds, data=None):
+    cmd = [str(python), '-m', 'training.train_lora', '--base', str(base),
+           '--out', str(run / 'adapter'), '--max-steps', str(steps),
+           '--max-seconds', str(seconds - 40), '--checkpoint-steps', str(steps // 4),
+           '--batch', '2', '--grad-accum', '2']
+    if data is not None:
+        cmd += ['--data', str(data)]
+    return cmd
 
 
 def require_completed(run, steps):
@@ -93,7 +99,7 @@ def pilot(args):
     converter = args.llama / 'convert_lora_to_gguf.py'
     inputs = [server, converter, args.gguf, args.base / 'config.json', args.base / 'tokenizer.json',
               ROOT / 'training/train_lora.py', ROOT / 'training/evaluate_pilot.py',
-              ROOT / 'training/train_pilot_v1.jsonl', ROOT / 'eval/run_eval.py',
+              args.data, ROOT / 'eval/run_eval.py',
               ROOT / 'minicut/llm/prompts.py', ROOT / 'minicut/grammar/minicut.gbnf']
     inputs += sorted((ROOT / 'eval').glob('eval_*.jsonl'))
     for path in inputs:
@@ -112,7 +118,9 @@ def pilot(args):
         run.mkdir(parents=True, exist_ok=False)
         hashes = {str(path): digest(path) for path in inputs}
         (run / 'factory-inputs.json').write_text(json.dumps(hashes, indent=2) + '\n')
-        train = training_command(sys.executable, args.base, run, steps=args.steps, seconds=args.seconds)
+        data = None if args.data == DEFAULT_DATA else args.data
+        train = training_command(sys.executable, args.base, run, steps=args.steps, seconds=args.seconds,
+                                 data=data)
         run_stage(run, 'train', ['timeout', str(args.seconds), *train], env)
         require_completed(run, args.steps)
         export_env = {**env, 'CUDA_VISIBLE_DEVICES': '', 'PYTHONPATH': str(args.llama / 'gguf-py')}
@@ -122,7 +130,7 @@ def pilot(args):
                       '--outfile', str(run / f'{label}.gguf'), str(path)], export_env)
         before = {**hashes, **{str(p): digest(p) for p in (run / 'early.gguf', run / 'final.gguf')}}
         run_stage(run, 'comparison', [sys.executable, '-m', 'training.evaluate_pilot', '--run', str(run),
-                  '--gguf', str(args.gguf), '--server', str(server)], env)
+                  '--gguf', str(args.gguf), '--server', str(server), '--data', str(args.data)], env)
         if any(digest(Path(p)) != h for p, h in before.items()):
             raise RuntimeError('factory inputs changed during the run')
         (run / 'factory-fingerprints.json').write_text(json.dumps(before, indent=2) + '\n')
@@ -138,6 +146,8 @@ def main():
     train.add_argument('--gpu', required=True)
     train.add_argument('--steps', type=int, default=100)
     train.add_argument('--seconds', type=int, default=900)
+    train.add_argument('--data', type=lambda path: Path(path).resolve(), default=DEFAULT_DATA,
+                       help='training rows (default: the v1 pilot set)')
     view = commands.add_parser('board')
     view.add_argument('--run', type=Path, required=True)
     args = parser.parse_args()
