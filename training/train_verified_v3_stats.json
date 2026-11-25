@@ -1,0 +1,29 @@
+{
+  "input": 4687,
+  "kept": 2319,
+  "dropped_by_reason": {
+    "combo_arg_pool": 76,
+    "eval_prompt_canon_collision": 22,
+    "eval_prompt_collision": 4,
+    "eval_tid_canon_collision": 361,
+    "near_miss_anchor_dropped": 116,
+    "over_target": 1789
+  },
+  "kept_by_tool": {
+    "clarify": 310,
+    "concat": 223,
+    "convert": 193,
+    "cut_out": 368,
+    "extract_audio": 244,
+    "mute": 120,
+    "scale": 255,
+    "speed": 300,
+    "trim": 306
+  },
+  "near_miss": {
+    "groups_kept": 60,
+    "partners_kept": 114,
+    "groups_without_partners": 0
+  },
+  "short_of_target": {}
+}

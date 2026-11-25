@@ -901,6 +901,13 @@ pub struct Ambiguous {
     pub fixed_pct: Option<u64>,
     pub other: Other,
     pub note: &'static str,
+    /// Near-miss partners (template id, kind): unambiguous wordings one step
+    /// away, emitted next to every clarify row of this wording with the same
+    /// file (and the same seconds when both use seconds), so the decision is
+    /// learned from the wording and not from the topic. Percentage and last-N
+    /// partners would need the clip's duration (P3-D12), so those anchors pair
+    /// with seconds or range wordings instead.
+    pub near: &'static [(&'static str, IntentKind)],
 }
 
 pub const AMBIGUOUS: &[Ambiguous] = &[
@@ -912,6 +919,10 @@ pub const AMBIGUOUS: &[Ambiguous] = &[
         fixed_pct: None,
         other: Other::Flip,
         note: "v1 labelled this keep-first; 'trim the first 25%' is read both ways",
+        near: &[
+            ("trim_t5", K::KeepFirst),
+            ("v3_remove_first", K::RemoveFirst),
+        ],
     },
     Ambiguous {
         id: "v3_amb_trim_last_pct",
@@ -921,6 +932,7 @@ pub const AMBIGUOUS: &[Ambiguous] = &[
         fixed_pct: None,
         other: Other::Flip,
         note: "same as above, at the end",
+        near: &[("trim_t3", K::KeepRange), ("cut_t2", K::RemoveRange)],
     },
     Ambiguous {
         id: "v3_amb_trim_first_half",
@@ -930,6 +942,10 @@ pub const AMBIGUOUS: &[Ambiguous] = &[
         fixed_pct: Some(50),
         other: Other::Flip,
         note: "keep or remove the first half",
+        near: &[
+            ("trim_t5", K::KeepFirst),
+            ("v3_remove_first", K::RemoveFirst),
+        ],
     },
     Ambiguous {
         id: "v3_amb_trim_last_half",
@@ -939,6 +955,7 @@ pub const AMBIGUOUS: &[Ambiguous] = &[
         fixed_pct: Some(50),
         other: Other::Flip,
         note: "keep or remove the last half",
+        near: &[("trim_t3", K::KeepRange), ("cut_t2", K::RemoveRange)],
     },
     Ambiguous {
         id: "v3_amb_cut_first",
@@ -948,6 +965,7 @@ pub const AMBIGUOUS: &[Ambiguous] = &[
         fixed_pct: None,
         other: Other::Flip,
         note: "without 'off' or 'down to', 'cut the first N seconds of X' is read both ways",
+        near: &[("cut_t1", K::RemoveFirst), ("v3_keep_first", K::KeepFirst)],
     },
     Ambiguous {
         id: "v3_amb_quiet",
@@ -957,6 +975,7 @@ pub const AMBIGUOUS: &[Ambiguous] = &[
         fixed_pct: None,
         other: Other::Unsupported("lower the volume"),
         note: "v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do",
+        near: &[("train_mute_x2", K::Mute)],
     },
 ];
 
@@ -980,6 +999,12 @@ pub const VOCAB: &[(IntentKind, &str)] = &[
 
 /// The vocabulary template for a kind (with the given number style, when the
 /// kind has several canonical styles).
+/// The template row with this id and kind (ids such as trim_t5 have one
+/// row per v1 branch).
+pub fn template(id: &str, kind: IntentKind) -> Option<&'static Template> {
+    TEMPLATES.iter().find(|t| t.id == id && t.kind == kind)
+}
+
 pub fn vocab(kind: IntentKind) -> Option<&'static Template> {
     let id = VOCAB.iter().find(|(k, _)| *k == kind)?.1;
     TEMPLATES
@@ -1009,7 +1034,9 @@ pub fn markdown() -> String {
         );
     }
     s += "\n## Ambiguous wording: always a clarify, never a label (P3-D11)\n\n\
-          | id | wording | numbers | first reading | other reading | why |\n|---|---|---|---|---|---|\n";
+          Each clarify row is emitted next to its near-miss partners (same file, and the same seconds\n\
+          when both use seconds), so the model learns the decision from the wording.\n\n\
+          | id | wording | numbers | first reading | other reading | near-miss partners | why |\n|---|---|---|---|---|---|---|\n";
     for a in AMBIGUOUS {
         let other = match a.other {
             Other::Flip => "flip (keep ↔ remove, same span)".to_string(),
@@ -1019,9 +1046,23 @@ pub fn markdown() -> String {
             Some(p) => format!("{:?} ({p}%)", a.num),
             None => format!("{:?}", a.num),
         };
+        let near: Vec<String> = a
+            .near
+            .iter()
+            .map(|(id, k)| {
+                let text = template(id, *k).map_or("(missing)", |t| t.text);
+                format!("`{id}` {text} ({k:?})")
+            })
+            .collect();
         s += &format!(
-            "| `{}` | {} | {} | {:?} | {} | {} |\n",
-            a.id, a.text, numbers, a.reading, other, a.note
+            "| `{}` | {} | {} | {:?} | {} | {} | {} |\n",
+            a.id,
+            a.text,
+            numbers,
+            a.reading,
+            other,
+            near.join("; "),
+            a.note
         );
     }
     s += "\n## Vocabulary offered in clarify questions\n\n| kind | template | wording |\n|---|---|---|\n";
@@ -1040,6 +1081,34 @@ pub fn markdown() -> String {
 mod tests {
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
+
+    #[test]
+    fn near_miss_partners_are_text_labelable_and_cover_both_readings() {
+        let keep = [K::KeepRange, K::KeepFirst, K::KeepLast];
+        for a in AMBIGUOUS {
+            assert!(!a.near.is_empty(), "{} has no near-miss partners", a.id);
+            for (id, k) in a.near {
+                let t =
+                    template(id, *k).unwrap_or_else(|| panic!("{}: no template {id} {k:?}", a.id));
+                assert!(!t.needs_probe(), "{}: partner {id} needs the probe", a.id);
+                assert!(!HELDOUT.contains(id), "{}: partner {id} is held out", a.id);
+                assert_ne!(t.text, a.text);
+            }
+            if a.other == Other::Flip {
+                // one partner per reading: the model sees "act" for both
+                assert!(
+                    a.near.iter().any(|(_, k)| keep.contains(k)),
+                    "{}: no keep partner",
+                    a.id
+                );
+                assert!(
+                    a.near.iter().any(|(_, k)| !keep.contains(k)),
+                    "{}: no remove partner",
+                    a.id
+                );
+            }
+        }
+    }
 
     const HELDOUT: &[&str] = &[
         "clarify_h1",

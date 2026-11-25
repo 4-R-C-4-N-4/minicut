@@ -103,14 +103,17 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 
 ## Ambiguous wording: always a clarify, never a label (P3-D11)
 
-| id | wording | numbers | first reading | other reading | why |
-|---|---|---|---|---|---|
-| `v3_amb_trim_first_pct` | trim the first {pct} of {file} | Pct | KeepFirst | flip (keep ↔ remove, same span) | v1 labelled this keep-first; 'trim the first 25%' is read both ways |
-| `v3_amb_trim_last_pct` | trim the last {pct} of {file} | Pct | KeepLast | flip (keep ↔ remove, same span) | same as above, at the end |
-| `v3_amb_trim_first_half` | trim the first half of {file} | NoTime (50%) | KeepFirst | flip (keep ↔ remove, same span) | keep or remove the first half |
-| `v3_amb_trim_last_half` | trim the last half of {file} | NoTime (50%) | KeepLast | flip (keep ↔ remove, same span) | keep or remove the last half |
-| `v3_amb_cut_first` | cut the first {b} seconds of {file} | Secs | RemoveFirst | flip (keep ↔ remove, same span) | without 'off' or 'down to', 'cut the first N seconds of X' is read both ways |
-| `v3_amb_quiet` | make {file} quiet | NoTime | Mute | unsupported: lower the volume | v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do |
+Each clarify row is emitted next to its near-miss partners (same file, and the same seconds
+when both use seconds), so the model learns the decision from the wording.
+
+| id | wording | numbers | first reading | other reading | near-miss partners | why |
+|---|---|---|---|---|---|---|
+| `v3_amb_trim_first_pct` | trim the first {pct} of {file} | Pct | KeepFirst | flip (keep ↔ remove, same span) | `trim_t5` trim {file} to the first {b} seconds (KeepFirst); `v3_remove_first` remove the first {b} seconds of {file} (RemoveFirst) | v1 labelled this keep-first; 'trim the first 25%' is read both ways |
+| `v3_amb_trim_last_pct` | trim the last {pct} of {file} | Pct | KeepLast | flip (keep ↔ remove, same span) | `trim_t3` keep only {a} to {b} seconds of {file} (KeepRange); `cut_t2` remove {a} to {b} seconds from {file} (RemoveRange) | same as above, at the end |
+| `v3_amb_trim_first_half` | trim the first half of {file} | NoTime (50%) | KeepFirst | flip (keep ↔ remove, same span) | `trim_t5` trim {file} to the first {b} seconds (KeepFirst); `v3_remove_first` remove the first {b} seconds of {file} (RemoveFirst) | keep or remove the first half |
+| `v3_amb_trim_last_half` | trim the last half of {file} | NoTime (50%) | KeepLast | flip (keep ↔ remove, same span) | `trim_t3` keep only {a} to {b} seconds of {file} (KeepRange); `cut_t2` remove {a} to {b} seconds from {file} (RemoveRange) | keep or remove the last half |
+| `v3_amb_cut_first` | cut the first {b} seconds of {file} | Secs | RemoveFirst | flip (keep ↔ remove, same span) | `cut_t1` cut the first {b} seconds off {file} (RemoveFirst); `v3_keep_first` keep only the first {b} seconds of {file} (KeepFirst) | without 'off' or 'down to', 'cut the first N seconds of X' is read both ways |
+| `v3_amb_quiet` | make {file} quiet | NoTime | Mute | unsupported: lower the volume | `train_mute_x2` make {file} silent (Mute) | v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do |
 
 ## Vocabulary offered in clarify questions
 

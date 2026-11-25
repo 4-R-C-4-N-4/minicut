@@ -1,7 +1,8 @@
 """Drop-only freeze gate between rows/meta from the Rust generator and a
-frozen train_verified_v1 split: cuts anything that collides with the eval
+frozen train_verified split: cuts anything that collides with the eval
 freeze (eval/freeze.json) or that is malformed, otherwise passes rows
-through byte-identical.
+through byte-identical and in file order. Near-miss partners of an
+ambiguous clarify row are kept only together with that row.
 """
 from __future__ import annotations
 
@@ -61,12 +62,11 @@ def build(rows_path: Path, meta_path: Path, root: Path = ROOT, targets: dict | N
     if len(row_lines) != len(meta_lines):
         raise ValueError(f"rows/meta line count mismatch: {len(row_lines)} vs {len(meta_lines)}")
 
-    kept_rows, kept_meta = [], []
     dropped_by_reason: Counter[str] = Counter()
-    kept_by_tool: Counter[str] = Counter()
-    kept_by_key: Counter[str] = Counter()
     seen_dupe: set[tuple[str, str]] = set()
 
+    # Pass 0, file order: parse and apply the freeze policy.
+    parsed = []  # (row_line, meta_line, label, meta) for rows that pass policy, else None
     for row_line, meta_line in zip(row_lines, meta_lines):
         try:
             row = json.loads(row_line)
@@ -80,6 +80,7 @@ def build(rows_path: Path, meta_path: Path, root: Path = ROOT, targets: dict | N
             label = json.loads(messages[2]["content"])
         except Exception:
             dropped_by_reason["malformed"] += 1
+            parsed.append(None)
             continue
 
         canon = _canon(label)
@@ -105,25 +106,59 @@ def build(rows_path: Path, meta_path: Path, root: Path = ROOT, targets: dict | N
 
         if reason is not None:
             dropped_by_reason[reason] += 1
+            parsed.append(None)
             continue
-
         seen_dupe.add(dupe_key)
-        # After every policy drop: keep the first N rows per tool (file order;
-        # the generator already shuffled). Selection only, never an edit.
+        parsed.append((row_line, meta_line, label, meta))
+
+    # Selection only, never an edit: keep the first N rows per target key in
+    # file order (the generator already shuffled). Near-miss groups first: a
+    # clarify_reading anchor and its partners (meta "group"); a partner is kept
+    # only with its anchor, and partners count against their tool's target.
+    kept_by_key: Counter[str] = Counter()
+    keep = [False] * len(parsed)
+
+    def is_partner(m):
+        return m.get("group") is not None and m.get("near_miss_of") is not None
+
+    def take(i, label, meta):
         key = target_key(label, meta)
         if targets is not None and kept_by_key[key] >= targets.get(key, 0):
             dropped_by_reason["over_target"] += 1
-            continue
+            return False
         kept_by_key[key] += 1
-        kept_rows.append(row_line)
-        kept_meta.append(meta_line)
-        kept_by_tool[label.get("tool")] += 1
+        keep[i] = True
+        return True
+
+    kept_groups = set()
+    for i, p in enumerate(parsed):
+        if p and p[3].get("group") is not None and not is_partner(p[3]):
+            if take(i, p[2], p[3]):
+                kept_groups.add(p[3]["group"])
+    partners = {"kept": 0, "anchor_dropped": 0}
+    for i, p in enumerate(parsed):
+        if p and is_partner(p[3]):
+            if p[3]["group"] not in kept_groups:
+                dropped_by_reason["near_miss_anchor_dropped"] += 1
+                partners["anchor_dropped"] += 1
+            elif take(i, p[2], p[3]):
+                partners["kept"] += 1
+    for i, p in enumerate(parsed):
+        if p and p[3].get("group") is None:
+            take(i, p[2], p[3])
+
+    kept_rows = [p[0] for i, p in enumerate(parsed) if keep[i]]
+    kept_meta = [p[1] for i, p in enumerate(parsed) if keep[i]]
+    kept_by_tool: Counter[str] = Counter(p[2].get("tool") for i, p in enumerate(parsed) if keep[i])
+    per_group = Counter(p[3]["group"] for i, p in enumerate(parsed) if keep[i] and is_partner(p[3]))
 
     stats = {
         "input": len(row_lines),
         "kept": len(kept_rows),
         "dropped_by_reason": dict(sorted(dropped_by_reason.items())),
         "kept_by_tool": dict(sorted(kept_by_tool.items())),
+        "near_miss": {"groups_kept": len(kept_groups), "partners_kept": partners["kept"],
+                      "groups_without_partners": sum(1 for g in kept_groups if per_group[g] == 0)},
         "short_of_target": {k: {"target": n, "kept": kept_by_key[k]}
                             for k, n in sorted((targets or {}).items())
                             if not k.startswith("_") and kept_by_key[k] < n},

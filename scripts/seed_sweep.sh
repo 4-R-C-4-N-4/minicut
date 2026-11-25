@@ -6,9 +6,9 @@ cd /home/ivy/Work/minicut
 BASE="$HOME/.cache/huggingface/hub/models--openbmb--MiniCPM5-2B/snapshots/42433e90dad95123ab87729fd7011e7110629556"
 PY=$HOME/Work/rellm/.venv/bin/python
 LOG=$TMPDIR/sweep.log
-: > "$LOG"
+: >> "$LOG"
 for seed in 1 2 3; do
-  for ds in pilot_v1 verified_v2; do
+  for ds in ${DATASETS:-pilot_v1 verified_v2}; do
     run=training/output/sweep-${ds}-s${seed}
     if [ -f "$run/comparison.json" ]; then echo "skip $run (done)" >> "$LOG"; continue; fi
     rm -rf "$run"
