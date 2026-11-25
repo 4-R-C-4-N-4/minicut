@@ -12,7 +12,9 @@
   - The acceptance preflight could never pass (missing `--base`); fixed.
   - Reused v1 ids `concat_t4` (word-for-word held-out `concat_h3`) and `train_scale_x1` (up/down by tuple order) corrected in the table.
 - **Python tests:** 86 passed. **Rust:** 0 warnings; `cargo test` green.
-- **Next:** the GPU exit experiment. Train a matched pilot on `train_verified_v1.jsonl` and board it against stock and pilot v1 on the 200 dev cases, with the same gate.
+- **GPU exit experiment (2026-11-24, `eval/PILOT_BOARD.md`):** matched pilot on `train_verified_v1`, gate **PASS** (26 gains / 2 regressions, keep/remove 52→61, 0 new inversions). On today's grader it **ties** the v1 pilot at 191/200 (agreeing on 198 cases). It fixes v1's keep/remove inversion (paraphrase-008) but over-clarifies one unambiguous held-out wording (paraphrase-015) and parrots the generator's fixed example numbers ("5 to 12 seconds"). One seed, so no claimed improvement.
+- **Grader drift found:** the 2026-11-22 no-op rule changed 6 stock verdicts after the v1 pilot was graded, so its old 197 is not comparable. The re-grade replays saved predictions (exact on the new run, 400/400).
+- **Next:** remove fixed example values from clarify suggestions, then run both datasets over several seeds to measure variance before choosing between them.
 
 ## Rust port, Phase 3: plan notes
 
