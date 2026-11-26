@@ -138,14 +138,16 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--targets", type=Path,
                         help="JSON of rows to keep per tool (e.g. training/verified_targets.json)")
+    parser.add_argument("--name", default="train_verified_v1",
+                        help="output stem: <name>.jsonl and <name>_meta.jsonl")
     args = parser.parse_args()
     targets = None
     if args.targets:
         targets = {k: v for k, v in json.loads(args.targets.read_text()).items() if not k.startswith("_")}
     kept_rows, kept_meta, stats = build(args.rows, args.meta, targets=targets)
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "train_verified_v1.jsonl").write_text("".join(line + "\n" for line in kept_rows))
-    (args.out / "train_verified_v1_meta.jsonl").write_text("".join(line + "\n" for line in kept_meta))
+    (args.out / f"{args.name}.jsonl").write_text("".join(line + "\n" for line in kept_rows))
+    (args.out / f"{args.name}_meta.jsonl").write_text("".join(line + "\n" for line in kept_meta))
     (args.out / "stats.json").write_text(json.dumps(stats, indent=2) + "\n")
     print(json.dumps(stats))
     if stats["short_of_target"]:

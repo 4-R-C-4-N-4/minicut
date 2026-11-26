@@ -339,6 +339,16 @@ pub struct Fill {
     pub n: Option<u64>,
 }
 
+/// Replace numeric placeholders with named slots for a suggestion whose
+/// numbers the user has not given.
+pub fn with_slots(text: &str) -> String {
+    text.replace("{a}", "START")
+        .replace("{b}", "END")
+        .replace("{w}", "WIDTH")
+        .replace("{h}", "HEIGHT")
+        .replace("{f}", "N")
+}
+
 pub fn render(text: &str, num: Num, v: &Fill) -> String {
     let time = |ms: Option<u64>| match (num, ms) {
         (Num::Clock, Some(x)) => clock_text(x),
@@ -797,40 +807,16 @@ impl Generator {
         })
     }
 
-    /// Vocabulary suggestion for a tool kind, with fixed example values.
+    /// Vocabulary suggestion for a tool kind. Numbers the user has not given
+    /// are shown as slots (START, END, WIDTH, HEIGHT, N), never as example
+    /// values: a fixed example ("5 to 12 seconds") was copied by the first
+    /// verified pilot into an unrelated request (eval_unseen_paraphrase-015).
     fn example(&self, kind: Kind, file: &str) -> String {
         let (k, v) = match kind {
-            Kind::Trim => (
-                K::KeepRange,
-                Fill {
-                    a: Some(5000),
-                    b: Some(12000),
-                    ..Default::default()
-                },
-            ),
-            Kind::CutOut => (
-                K::RemoveRange,
-                Fill {
-                    a: Some(5000),
-                    b: Some(12000),
-                    ..Default::default()
-                },
-            ),
-            Kind::Scale => (
-                K::ScaleExact,
-                Fill {
-                    w: Some(960),
-                    h: Some(540),
-                    ..Default::default()
-                },
-            ),
-            Kind::Speed => (
-                K::SpeedFactor,
-                Fill {
-                    f_pm: Some(2000),
-                    ..Default::default()
-                },
-            ),
+            Kind::Trim => (K::KeepRange, Fill::default()),
+            Kind::CutOut => (K::RemoveRange, Fill::default()),
+            Kind::Scale => (K::ScaleExact, Fill::default()),
+            Kind::Speed => (K::SpeedFactor, Fill::default()),
             Kind::Convert => (
                 K::Convert,
                 Fill {
@@ -857,7 +843,7 @@ impl Generator {
         };
         let t = vocab(k).expect("every tool kind has a vocabulary phrasing");
         render(
-            t.text,
+            &with_slots(t.text),
             t.num,
             &Fill {
                 file: file.to_string(),
@@ -1076,6 +1062,36 @@ mod tests {
             let s = render(a.text, a.num, &full);
             assert!(!s.contains('{') && !s.contains('}'), "{}: {s}", a.id);
         }
+    }
+
+    #[test]
+    fn missing_arg_questions_never_invent_numbers() {
+        // The user gave no numbers for the missing arguments, so the question
+        // must not contain any (eval_unseen_paraphrase-015 parroted a fixed
+        // "5 to 12" example). Filenames may contain digits (clip2.mp4).
+        let digits = |t: &str| -> Vec<String> {
+            t.split_whitespace()
+                .map(|w| w.trim_matches(|c: char| "\"?.,:".contains(c)))
+                // numbers start with a digit (5, 7.5, 2x, 960x540); names such
+                // as libx264 or clip2.mp4 do not
+                .filter(|w| w.starts_with(|c: char| c.is_ascii_digit()))
+                .map(String::from)
+                .collect()
+        };
+        let mut g = Generator::new(5);
+        let mut checked = 0;
+        for _ in 0..2000 {
+            if let Some(r) = g.clarify_missing_row() {
+                let v: serde_json::Value = serde_json::from_str(&r.assistant).unwrap();
+                let q = v["question"].as_str().unwrap();
+                let said = digits(&r.prompt);
+                for n in digits(q) {
+                    assert!(said.contains(&n), "invented {n}: {:?} -> {q}", r.prompt);
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked > 100, "{checked}");
     }
 
     #[test]

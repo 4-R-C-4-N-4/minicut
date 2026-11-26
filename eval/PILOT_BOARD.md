@@ -45,3 +45,33 @@ On the same grader the two adapters **tie at 191/200** and agree on 198 cases. T
 **Reading:** with one seed and one case each way, label quality did not move the score. It removed the keep/remove inversion and introduced an over-clarify with parroted example numbers. That second effect is a generator defect: fixed example values in clarify suggestions. Before more training, fix the suggestion examples and measure seed variance (both datasets, more than one seed) before claiming a difference.
 
 Local evidence: `training/output/pilot-verified-20261124-201746/` (factory inputs, `comparison.json`, per-arm predictions and graded rows).
+
+
+## Seed sweep: v1 pilot data vs `train_verified_v2` (seeds 1–3)
+
+`train_verified_v2` is `train_verified_v1` with one change: clarify suggestions show slots ("keep only START to END seconds of X") instead of the fixed example "5 to 12 seconds" that the first verified pilot copied into eval_unseen_paraphrase-015. Same recipe and step cap; only the data and seed vary. All runs on today's grader; every board re-verified on CPU. The seed 42 rows are from above (v1 re-graded; verified *v1* data).
+
+| Data | Seed | Tuned | Gains / regressions | Keep/remove (of 64) | New inversions | Unnecessary clarifies | Gate |
+|---|---:|---:|---:|---:|---|---:|---|
+| pilot v1 | 42 | 191 | 27 / 3 | 61 | paraphrase-008 | 0 | Fail |
+| pilot v1 | 1 | 191 | 27 / 3 | 61 | paraphrase-016 | 0 | Fail |
+| pilot v1 | 2 | 188 | 25 / 4 | 60 | paraphrase-006, -008 | 0 | Fail |
+| pilot v1 | 3 | 189 | 24 / 2 | 61 | paraphrase-008 | 0 | Fail |
+| verified v1 | 42 | 191 | 26 / 2 | 61 | — | 1 | Pass |
+| verified v2 | 1 | **175** | 18 / 10 | 49 | — | **18** | Fail |
+| verified v2 | 2 | 190 | 25 / 2 | 62 | — | 1 | Pass |
+| verified v2 | 3 | 190 | 25 / 2 | 62 | — | 2 | Pass |
+
+Stock is 167/200 in every run.
+
+**Reading.**
+- **Inversions:** v1 data introduces a new keep/remove inversion at every seed (4/4; paraphrase-008 "isolate seconds 3 through 9" in 3 of them). Verified data introduces none (0/4). This is the consistent, seed-stable effect of the verified labels.
+- **Score:** no reliable difference. v1 data spans 188–191. Verified data scores 190–191 except one collapse.
+- **The collapse (v2 seed 1):** the model over-clarifies plain keep/remove requests, for example "keep only 2 to 8 seconds of clip.mp4" → "Do you want to keep only part of clip.mp4, or cut part of it out?". 13 of its 18 unnecessary clarifies are that question. The ambiguous-reading rows (60 rows, 2.6%) taught "keep vs remove?" as a reflex that, at this seed, spread to unambiguous wordings. Likely contributor (unverified): the ambiguous template `v3_amb_cut_first` ("cut the first N seconds **of** X", 18 rows) sits one word away from the dev case "cut the first 10 seconds **off** clip.mp4" (expected cut_out).
+- So the verified labels trade one failure mode (silent inversions, every seed) for another (over-asking, 1 seed in 3). A silent inversion destroys the wrong part of a video; an unnecessary question costs a turn. The safer failure mode favours verified data, but the collapse must be fixed before preferring it.
+
+**Next.** Stabilise the ambiguity rows rather than add data:
+- pair every ambiguous row with near-miss unambiguous rows (for example "cut the first N seconds off X" → cut_out next to "… of X" → clarify), so the decision is learned from wording rather than from topic;
+- re-run seeds 1–3 and accept verified data only if no seed collapses.
+
+Local evidence: `training/output/sweep-{pilot_v1,verified_v2}-s{1,2,3}/`; `scripts/seed_sweep.sh` reproduces them (it skips finished runs).

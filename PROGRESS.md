@@ -14,7 +14,11 @@
 - **Python tests:** 86 passed. **Rust:** 0 warnings; `cargo test` green.
 - **GPU exit experiment (2026-11-24, `eval/PILOT_BOARD.md`):** matched pilot on `train_verified_v1`, gate **PASS** (26 gains / 2 regressions, keep/remove 52→61, 0 new inversions). On today's grader it **ties** the v1 pilot at 191/200 (agreeing on 198 cases). It fixes v1's keep/remove inversion (paraphrase-008) but over-clarifies one unambiguous held-out wording (paraphrase-015) and parrots the generator's fixed example numbers ("5 to 12 seconds"). One seed, so no claimed improvement.
 - **Grader drift found:** the 2026-11-22 no-op rule changed 6 stock verdicts after the v1 pilot was graded, so its old 197 is not comparable. The re-grade replays saved predictions (exact on the new run, 400/400).
-- **Next:** remove fixed example values from clarify suggestions, then run both datasets over several seeds to measure variance before choosing between them.
+- **Clarify slots + seed sweep (`eval/PILOT_BOARD.md`):** `train_verified_v2` replaces the fixed "5 to 12" suggestion example with slots (test: no missing-argument question contains a number the user did not say). Seeds 1–3 for both datasets:
+  - v1 data: 188–191, and a new keep/remove inversion at every seed (4/4).
+  - verified data: 0 inversions (0/4) and 190–191, except one collapse at v2 seed 1 (175, 18 unnecessary "keep or remove?" clarifies on plain keep/remove requests).
+  - No reliable score difference.
+- **Next:** pair each ambiguous-reading template with near-miss unambiguous rows ("cut the first N seconds off X" → cut_out), then re-run seeds 1–3; adopt verified data only if no seed collapses.
 
 ## Rust port, Phase 3: plan notes
 

@@ -17,13 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = ROOT / 'training/train_pilot_v1.jsonl'
 
 
-def training_command(python, base, run, *, steps, seconds, data=None):
+def training_command(python, base, run, *, steps, seconds, data=None, seed=None):
     cmd = [str(python), '-m', 'training.train_lora', '--base', str(base),
            '--out', str(run / 'adapter'), '--max-steps', str(steps),
            '--max-seconds', str(seconds - 40), '--checkpoint-steps', str(steps // 4),
            '--batch', '2', '--grad-accum', '2']
     if data is not None:
         cmd += ['--data', str(data)]
+    if seed is not None:
+        cmd += ['--seed', str(seed)]
     return cmd
 
 
@@ -120,7 +122,7 @@ def pilot(args):
         (run / 'factory-inputs.json').write_text(json.dumps(hashes, indent=2) + '\n')
         data = None if args.data == DEFAULT_DATA else args.data
         train = training_command(sys.executable, args.base, run, steps=args.steps, seconds=args.seconds,
-                                 data=data)
+                                 data=data, seed=args.seed)
         run_stage(run, 'train', ['timeout', str(args.seconds), *train], env)
         require_completed(run, args.steps)
         export_env = {**env, 'CUDA_VISIBLE_DEVICES': '', 'PYTHONPATH': str(args.llama / 'gguf-py')}
@@ -148,6 +150,7 @@ def main():
     train.add_argument('--seconds', type=int, default=900)
     train.add_argument('--data', type=lambda path: Path(path).resolve(), default=DEFAULT_DATA,
                        help='training rows (default: the v1 pilot set)')
+    train.add_argument('--seed', type=int, help='training seed (default: train_lora\'s 42)')
     view = commands.add_parser('board')
     view.add_argument('--run', type=Path, required=True)
     args = parser.parse_args()

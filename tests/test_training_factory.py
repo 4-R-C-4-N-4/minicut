@@ -20,6 +20,9 @@ class TestTrainingFactory(unittest.TestCase):
         cmd = training_command('python', Path('snapshot'), Path('run'), steps=100, seconds=900,
                                data=Path('training/train_verified_v1.jsonl'))
         self.assertEqual(cmd[cmd.index('--data') + 1], 'training/train_verified_v1.jsonl')
+        self.assertNotIn('--seed', cmd)
+        cmd = training_command('python', Path('snapshot'), Path('run'), steps=100, seconds=900, seed=3)
+        self.assertEqual(cmd[cmd.index('--seed') + 1], '3')
 
     def test_fit_roster_samples_the_given_dataset(self):
         from training.evaluate_pilot import fit_roster
