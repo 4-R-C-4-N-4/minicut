@@ -75,3 +75,32 @@ Stock is 167/200 in every run.
 - re-run seeds 1–3 and accept verified data only if no seed collapses.
 
 Local evidence: `training/output/sweep-{pilot_v1,verified_v2}-s{1,2,3}/`; `scripts/seed_sweep.sh` reproduces them (it skips finished runs).
+
+
+## Near-miss pairs (`train_verified_v3`, seeds 1–3)
+
+`train_verified_v3` emits every ambiguous clarify row together with unambiguous partners on the same file, and with the same seconds where both use seconds. For example, "cut the first 7 seconds **of** X" → clarify sits next to "cut the first 7 seconds **off** X" → cut_out and "keep only the first 7 seconds of X" → trim. The dataset has 60 groups and 114 partners, with per-tool counts unchanged. All runs were graded by today's grader, and every board was re-verified on CPU.
+
+| Data | Seed 1 | Seed 2 | Seed 3 | New inversions | Unnecessary clarifies (s1/s2/s3) | Gate |
+|---|---:|---:|---:|---|---|---|
+| pilot v1 | 191 | 188 | 189 | every seed | 0 / 0 / 0 | 0/3 |
+| verified v2 | 175 | 190 | 190 | none | 18 / 1 / 2 | 2/3 |
+| verified v3 (near-miss) | 182 | 191 | 180 | none | 7 / 1 / 13 | 3/3 |
+
+**Reading: the pairs did not stabilise it.**
+- v3 has two weak seeds out of three; v2 had one.
+- Means: v1 data 189.3, v2 185.0, v3 184.3.
+- The verified data still introduces no keep/remove inversion in any of its 7 runs.
+
+The failure is concentrated on one wording:
+- The dev prompt "cut the first 10 seconds off clip.mp4" (expected cut_out) appears 4 times in the dev suite.
+- It flips to a clarify in every weak verified run (v2 s1, v3 s1, v3 s3), costing 4 points each time.
+- It is one letter from the ambiguous template `v3_amb_cut_first` ("… of X"). Pairing added more "… off X" rows (38 vs 27 in v2) but 100 updates do not learn the of/off distinction reliably.
+
+At v3 seed 3 the reflex also spread to other tools: "remove the audio from clip.mp4" became "Do you want to keep only the audio, or remove the audio?" (3 cases), and "scale … to 720p" became a size question.
+
+**Next (decision needed):**
+- Whether "cut the first N seconds of X" belongs in the ambiguous table at all. A wording one letter from a canonical cut is a poor teaching signal at this size.
+- An ablation without reading-ambiguous rows: verified tool labels plus missing-argument clarifies only. It would show whether the inversion fix survives without the over-clarify risk.
+
+Local evidence: `training/output/sweep-verified_v3-s{1,2,3}/`.
