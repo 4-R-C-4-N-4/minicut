@@ -151,10 +151,10 @@ impl Counts {
                 ("extract_audio", 244),
                 ("mute", 120),
             ],
-            // 4 unsupported wordings x ~30 filenames cannot fill 60 unique
-            // rows; the pilot's clarify total (310) is kept
-            clarify_missing: 280,
-            clarify_unsupported: 30,
+            // the pilot's clarify total (310); one unsupported wording
+            // ("make X quiet") is a small class
+            clarify_missing: 300,
+            clarify_unsupported: 10,
         }
     }
 }
@@ -852,8 +852,7 @@ impl Generator {
             "clip.mp4".to_string()
         };
         let missing = clarify::missing_names(req.kinds[0], req.provided);
-        let suggestions: Vec<String> = req.kinds.iter().map(|k| self.example(*k, &file)).collect();
-        let question = clarify::missing_question(req, &file, &suggestions);
+        let question = clarify::missing_question(req);
         let prompt = req.text.replace("{file}", &file);
         let assistant = dumps(&clarify_json(&question, &missing));
         let m = meta(

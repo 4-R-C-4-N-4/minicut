@@ -903,36 +903,13 @@ pub struct Unsupported {
     pub note: &'static str,
 }
 
-pub const UNSUPPORTED: &[Unsupported] = &[
-    Unsupported {
-        id: "v3_amb_quiet",
-        text: "make {file} quiet",
-        offer: K::Mute,
-        what: "lower the volume",
-        note: "v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do",
-    },
-    Unsupported {
-        id: "v4_unsup_quieter",
-        text: "make {file} quieter",
-        offer: K::Mute,
-        what: "lower the volume",
-        note: "a volume change, not silence",
-    },
-    Unsupported {
-        id: "v4_unsup_lower_volume",
-        text: "lower the volume of {file}",
-        offer: K::Mute,
-        what: "lower the volume",
-        note: "a volume change, not silence",
-    },
-    Unsupported {
-        id: "v4_unsup_turn_down",
-        text: "turn the sound down in {file}",
-        offer: K::Mute,
-        what: "lower the volume",
-        note: "'down', not 'off': a volume change",
-    },
-];
+pub const UNSUPPORTED: &[Unsupported] = &[Unsupported {
+    id: "v3_amb_quiet",
+    text: "make {file} quiet",
+    offer: K::Mute,
+    what: "lower the volume",
+    note: "v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do",
+}];
 
 /// Canonical phrasing per intent kind: the vocabulary offered as suggestions
 /// in clarify questions (P3-D11). Each entry names a row of `TEMPLATES`; a

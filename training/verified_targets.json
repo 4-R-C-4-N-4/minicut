@@ -1,5 +1,5 @@
 {
-  "_comment": "Pilot-matched rows per tool (training/train_pilot_v1_meta.jsonl); clarify 310 = 280 argument-missing + 30 unsupported-request (phrasebook plan: no keep/remove ambiguity rows).",
+  "_comment": "Pilot-matched rows per tool (training/train_pilot_v1_meta.jsonl); clarify 310 = 300 argument-missing + 10 unsupported-request (v5: short v1-style questions).",
   "trim": 306,
   "cut_out": 368,
   "concat": 223,
@@ -8,6 +8,6 @@
   "convert": 193,
   "extract_audio": 244,
   "mute": 120,
-  "clarify_missing": 280,
-  "clarify_unsupported": 30
+  "clarify_missing": 300,
+  "clarify_unsupported": 10
 }

@@ -107,9 +107,6 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 | id | request | offered instead | cannot | why |
 |---|---|---|---|---|
 | `v3_amb_quiet` | make {file} quiet | mute {file} | lower the volume | v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do |
-| `v4_unsup_quieter` | make {file} quieter | mute {file} | lower the volume | a volume change, not silence |
-| `v4_unsup_lower_volume` | lower the volume of {file} | mute {file} | lower the volume | a volume change, not silence |
-| `v4_unsup_turn_down` | turn the sound down in {file} | mute {file} | lower the volume | 'down', not 'off': a volume change |
 
 ## Vocabulary offered in clarify questions
 

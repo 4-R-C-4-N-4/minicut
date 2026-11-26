@@ -1,7 +1,7 @@
 //! Clarify rows: requests that cannot be labelled get a question, never a
 //! guess (plan P3-D11). `missing` is always computed by the verified core
 //! (`minicut_core::missing`), never written by hand. Questions offer our own
-//! vocabulary (templates::VOCAB) as suggestions; graders compare only
+//! short per-tool question (v1 style, no example request); graders compare only
 //! `missing`, so the wording can carry them without changing any score.
 
 use minicut_core::Kind;
@@ -237,30 +237,18 @@ fn ask(kind: Kind) -> &'static str {
     }
 }
 
-fn quoted_list(suggestions: &[String]) -> String {
-    let q: Vec<String> = suggestions.iter().map(|s| format!("\"{s}\"")).collect();
-    match q.len() {
-        0 => String::new(),
-        1 => q[0].clone(),
-        _ => format!("{} or {}", q[..q.len() - 1].join(", "), q[q.len() - 1]),
-    }
-}
-
-/// Question for an argument-missing request. `suggestions` are vocabulary
-/// phrasings already rendered with example values, one per kind in
-/// `req.kinds` (same order).
-pub fn missing_question(req: &Request, file: &str, suggestions: &[String]) -> String {
-    let head = if req.kinds == TRIM_OR_CUT {
-        format!(
-            "Do you want to keep only part of {file} or cut part of it out? Tell me the start and end times."
-        )
+/// Question for an argument-missing request: v1's short per-tool question
+/// (train_pilot_v1 used exactly these), no filename and no example request.
+/// The pilots on train_verified_v2..v4, whose questions ended with
+/// 'For example: "<a tool request>"', over-clarified at every seed while v1
+/// data never did (eval/PILOT_BOARD.md); the phrasebook now lives in
+/// `minicut --help` instead. "trim X" / "cut X" (keep or remove not said)
+/// get a neutral question: asking "keep or remove?" is not taught.
+pub fn missing_question(req: &Request) -> String {
+    if req.kinds == TRIM_OR_CUT {
+        "What start and end times should I use?".to_string()
     } else {
         ask(req.kinds[0]).to_string()
-    };
-    if suggestions.is_empty() {
-        head
-    } else {
-        format!("{head} For example: {}.", quoted_list(suggestions))
     }
 }
 
@@ -375,17 +363,25 @@ mod tests {
     }
 
     #[test]
-    fn questions_carry_every_suggestion() {
-        let r = REQUESTS.iter().find(|r| r.id == "v3_clar_cut").unwrap();
-        let s = vec![
-            "keep only START to END seconds of clip.mp4".to_string(),
-            "remove START to END seconds from clip.mp4".to_string(),
-        ];
-        let q = missing_question(r, "clip.mp4", &s);
+    fn missing_questions_are_short_and_quote_no_request() {
+        for r in REQUESTS {
+            let q = missing_question(r);
+            assert!(q.len() <= 50, "{}: {q}", r.id);
+            assert!(
+                !q.contains('"') && !q.contains("For example"),
+                "{}: {q}",
+                r.id
+            );
+            assert!(
+                !q.contains("keep") && !q.contains("remove"),
+                "{}: {q}",
+                r.id
+            );
+        }
+        let cut = REQUESTS.iter().find(|r| r.id == "v3_clar_cut").unwrap();
         assert_eq!(
-            q,
-            "Do you want to keep only part of clip.mp4 or cut part of it out? Tell me the start and end times. \
-             For example: \"keep only START to END seconds of clip.mp4\" or \"remove START to END seconds from clip.mp4\"."
+            missing_question(cut),
+            "What start and end times should I use?"
         );
         assert_eq!(
             unsupported_question("mute clip.mp4", "lower the volume"),

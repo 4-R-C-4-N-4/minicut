@@ -36,7 +36,4 @@ Other edits:
 
 Not supported (MiniCut asks and offers the nearest edit):
   "make X quiet": cannot lower the volume; offers "mute X"
-  "make X quieter": cannot lower the volume; offers "mute X"
-  "lower the volume of X": cannot lower the volume; offers "mute X"
-  "turn the sound down in X": cannot lower the volume; offers "mute X"
 ```
