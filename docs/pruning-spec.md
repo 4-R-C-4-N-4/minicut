@@ -1,6 +1,6 @@
 # MiniCut pruning spec: finding the smallest model that can still do the job
 
-Status: proposal for review — doc only, no code, no training, no eval changes.
+Status: reviewed proposal — doc only. No training is authorized by this spec.
 Date: 2026-11-26
 Base: `main` at `d79051a` (Merge PR #8, near-miss sweep)
 Author: Muse, for Ivy — for review by the local agent.
@@ -101,30 +101,29 @@ things:
     inversion (`isolate seconds 3–9` read as removing that range).
   - verified-label pilot (`train_verified_v1`, same recipe/seed):
     tuned 191/200, 0 new inversions, gate **passed** — once.
-  - seed sweep, verified v2/v3 data: tuned 175–191 across seeds
-    1–3; one seed collapsed to 175 through over-clarifying
-    (18 unnecessary clarifies). Verified data introduces no new
-    inversions in 7 runs, but it does not reliably hold 191.
-  - Stock stays the default. See `eval/PILOT_BOARD.md` and
-    Appendix A for the full table.
+  - The 14 pre-v5 pilots, scored on the same grader, span 175–191/200.
+    Verified v1–v3 added no inversions in seven runs, but v4 added
+    inversions at two of three seeds. The v5 short-clarify sweep scored
+    **179 / 188 / 192**, with **13 / 1 / 0** unnecessary clarifies and gates
+    **pass / fail / pass**. Seed 2 added two inversions. V5 also reshuffled
+    the tool sample (1,261 of 2,009 tool rows shared with v4), so this is
+    not an isolated test of question length. See Appendix A and
+    `eval/PILOT_BOARD.md`. Stock remains the deployment default.
 
-Consequence for this spec: **the teacher must be named in the
-experiment log before the ladder starts**, with all of: base
-checkpoint (final RL+OPD, F16 GGUF), adapter if any (which data
-version, which seed, merged or not), server and decoding (§6.3),
-and its frozen-eval score on `intent_v2` measured on the same
-grader as the students. The candidates are (a) stock F16
-(167/200), (b) the verified-v1 LoRA adapter merged (191/200,
-one seed, gate passed once), or (c) a fresh teacher trained on
-the current verified data with a seed sweep, so its score is
-not a single-seed artefact. The spec does not pick between
-these — that is open question §8.1 — but no student result is
-interpretable until the pick is recorded. If the teacher is
-(b) or (c), the LoRA adapter must be *merged* into the base
-before pruning: pruning a LoRA-tuned model, or pruning the
-base and keeping an adapter trained for 42 layers, invalidates
-the adapter. Order is: prune the base, then distill-train the
-student (see §6.3).
+There is no accepted tuned teacher. Before scheduling the ladder, select a
+2B recipe that passes the existing pilot gate at each of at least three
+predeclared seeds, then pin a reference artifact using a selection rule
+written before evaluation (not the best development score). Record the HF
+revision, adapter/data hashes and seeds, merge status, GGUF hash and quant,
+grammar, server and decoding. Re-score the exact artifact on the frozen
+`intent_v2` grader and independent release benchmark. The observed stock
+167/200 is for Q4_K_M, not a measured F16 score. Use stock as a diagnostic
+control, not as a weaker substitute for a qualified teacher.
+
+If the chosen reference uses LoRA, merge it into its HF base before slicing
+tensors when initializing students from that checkpoint; verify the merged
+reference separately. Do not apply the original 42-layer adapter to a pruned
+base. Keep the full reference unpruned for comparisons and any later KL arm.
 
 Non-goals for this spec: no change to `config/tools.yaml`, the GBNF
 grammar, the wrapper, the frozen eval, or the release benchmark;
@@ -217,30 +216,22 @@ For MiniCut, fit the *task* version of the same form:
 L_task(N) = E_task + A_task / N^α_task
 ```
 
-`E_task` is MiniCut's irreducible loss, not general text entropy.
-It is estimated from the teacher: the fine-tuned 2B model's
-cross-entropy / error rate on held-out task data, at the point
-where more parameters stop helping. `A_task` and `α_task` are
-fitted from the student ladder in §6, not borrowed from
-Chinchilla — a narrow task's exponents will differ from general
-text, and borrowing them would be the error this spec is
-designed to avoid. Definition of `N` for the fit: **non-embedding
-parameters** throughout (see §5.1), because vocab trimming
-moves total parameters a lot while moving non-embedding
-parameters not at all; total parameters and GGUF bytes are
-reported alongside, never substituted for `N`. `E_task` itself
-must be measured on held-out data the teacher was *not*
-trained on (frozen eval prompts are held out by the freeze
-rules, but the teacher's training corpus is drawn from the
-same template pools, so also report teacher loss on the
-unseen-paraphrase split alone, where the templates were never
-in training). A teacher loss measured on data the teacher
-trained on is an overfit number, not `E_task`.
+`L_task` is mean teacher-forced negative log-likelihood in nats per
+supervised assistant token (including the same end-of-response convention)
+on a fixed, held-out task corpus. Use the same tokenizer, prompts, masking
+and scoring implementation for every depth point. Report separate loss for
+tool calls and clarifications; do not fit on the 200-case accuracy. Freeze a
+sufficiently large and diverse generated holdout before training (§6.1).
+Use a separate holdout from the loss set for early stopping if needed.
 
-The curve to expect: smooth, diminishing returns, no cliff.
-That is the entropy curve in usable form. The knee — where
-accuracy falls off faster than parameters are saved — is the
-floor for a given acceptance threshold.
+`N` counts non-embedding parameters for the fixed-vocabulary depth series;
+report total parameters and GGUF bytes separately. The fitted `E_task` is
+an empirical asymptote for this recipe, not an entropy measurement, a
+proven lower bound, or the finite teacher's loss. Fit only if there are
+more distinct sizes than free parameters; check stability across seeds and
+against an unused size before interpreting the curve. Do not extrapolate a
+minimum or map NLL to task accuracy without evidence. The decision is the
+smallest *measured* candidate that passes §5, not the fitted knee.
 
 Evidence that the floor moves with data, not just size:
 MobileLLM-R1-950M matches or surpasses Qwen3-0.6B on reasoning
@@ -304,7 +295,7 @@ Implications, in order of payoff:
 
 ## 4. Trimming levers, in order
 
-### 4.1 Vocabulary trimming (do this first in the analysis)
+### 4.1 Vocabulary trimming (analysis only; deferred for deployment)
 
 Vocabulary trimming deletes tokens that never occur in the
 target task, shrinking both the input embedding and the lm_head.
@@ -326,65 +317,25 @@ https://openreview.net/pdf?id=0iXlSGtiH8
 That joint order matters — prune the vocab first, then score
 FFN channels on the tokens that survive.
 
-For MiniCut, split the two matrices, because they have
-different jobs:
+MiniCPM has untied input and output matrices (~267.4M parameters each).
+The Llama GGUF loader sizes both from the tokenizer vocabulary and rejects
+mismatched tensor shapes (`llama-model-loader.cpp`, shape check; inspected
+at llama.cpp `01818e495`). Dropping output rows alone is not a stock GGUF
+option. A shared reduced vocabulary needs a remapped tokenizer, consistent
+BPE merges and special IDs, and matching input/output rows in a custom
+conversion pipeline. Current LoRA targets only attention and MLP
+projections; that removes one adapter-shape concern, not the tokenizer
+or loader constraints.
 
-- **lm_head (output):** prune to the tokens that can appear in
-  a valid tool call. That set is enumerable from
-  `config/tools.yaml` + the GBNF grammar: tool names, digits,
-  `.`, `-`, `:`, `,`, `[`, `]`, `{`, `}`, `"`, enum values
-  (`libx264`, `mp4`, `mp3`, …). **But that enumeration is only
-  the whole story if clarify questions stop being free text.**
-  Today `clarify.question` is a free-text `str`
-  (`config/tools.yaml`), the model writes the question in
-  English, and the grader scores only the `missing` list, not
-  the wording (`eval/README.md`, `crates/minicut/src/clarify.rs`).
-  The training mix is also 12% general plain-text replies
-  (360/3000 in `train_v1.jsonl`, `training/README.md`), which
-  need a general English output head. So the "~200 tokens"
-  figure in v1 of this spec was wrong as stated: it is the
-  tool-call-only token set, not the actual output token set
-  of the model as trained. Two honest options, and the spec
-  must pick one before a vocab-trim experiment:
-  (a) **Templated clarify:** the question is generated by the
-  verified core from the `missing` list and the phrasebook
-  vocabulary (`templates::VOCAB`), and the model outputs only
-  the tool name + `missing` — a design change to the tool
-  contract and the grammar, not a measurement; or
-  (b) **English output head kept:** the lm_head is trimmed
-  only to English + tool-call tokens actually seen in training
-  outputs, which will be thousands of tokens, not ~200, and
-  the saving is correspondingly smaller.
-  Either way, measure the exact output token set from the
-  training outputs (tokenise every assistant reply in the
-  distillation set, count distinct token ids, and report the
-  cumulative-frequency curve) before claiming a number.
-  Do not guess it.
-- **Input embedding:** prune to tokens actually seen in the
-  training/eval corpora plus the phrasebook synonyms, plus
-  byte-fallback tokens. Keep a frequency count from the
-  grammar-generated corpus and cut below a threshold, then
-  measure the out-of-vocabulary rate on held-out paraphrases.
-  The risk is a real user word that was never in the corpus —
-  that failure mode must be measured, not assumed away.
-  Note what must survive any trim, because it is not in the
-  task corpus alone: the system prompt and few-shot examples
-  (identical at train and inference, `minicut/llm/prompts.py`),
-  the GBNF/JSON punctuation, and BPE subwords for arbitrary
-  filenames and numbers. Filenames are copied from the prompt
-  into the `input` field (30 filenames in `train_v1`, and the
-  eval convention is `clip.mp4`), and numbers are tokenised
-  unpredictably by the MiniCPM tokenizer — `12.5`, `1m30s`,
-  `720p` do not decompose into a tidy digit set. Measure the
-  token set on tokenised prompts, not on words.
-
-Open question for the reviewer: does llama.cpp / GGUF support
-a trimmed vocab cleanly for this model (retokenised tokenizer,
-remapped ids, lm_head rows dropped), or does vocab trimming
-force a custom export? Answer that before scheduling any
-vocab-trim experiment. If GGUF makes it painful, the
-vocab-trim saving is still real for a future runtime, but it
-is not the first experiment.
+The grammar's fixed literals are not the output-token set. `input`,
+`output` and `clarify.question` are free strings in both the current grammar
+and the Rust strict grammar. Filenames, decimal forms, escaping and English
+questions require more than punctuation and enums. A token census of the
+training split and a separate held-out corpus may characterize observed
+coverage and fallback expansion; it cannot establish a safe production
+allowlist. Never build that allowlist from frozen dev or release cases.
+Keep the output contract and full tokenizer in the first ladder. Templated
+clarification would be a separate contract change, not a prerequisite.
 
 ### 4.2 Structured pruning: depth and width (Minitron method)
 
@@ -410,66 +361,43 @@ Applied to MiniCPM5-2B:
   in transformers/llama.cpp terms, biggest latency win (fewer
   sequential dispatches), but coarsest — accuracy can drop
   abruptly. Rank layers by importance first (ablation: drop one
-  layer, measure frozen-eval drop; or activation/gradient
-  magnitude on task data), do not drop uniformly, and record
+  layer, measure loss on a ranking-only calibration split; or use
+  activation or gradient magnitude on task data), do not drop uniformly, and record
   *which* layers were dropped: dropping the last N layers,
   dropping evenly spaced layers, and dropping the
   importance-ranked lowest layers are three different
   experiments with different results. The ladder in §6.2
   assumes importance-ranked dropping; if the reviewer picks a
   different rule, the ladder's sizes stay the same but its
-  results will not be comparable to this spec's predictions.
-  Prune the *base* model, then distill-train — never prune a
-  model that already carries a LoRA adapter trained for the
-  unpruned shape (see §1.1).
+  results test a different pruning policy. If initializing from a LoRA-tuned
+  reference, prune its merged HF weights, not the unmerged adapter (§1.1).
 - **Width pruning:** remove attention heads, MLP intermediate
   channels, and/or hidden channels. Finer-grained, usually
   better accuracy at the same parameter count, but needs
   surgery on every matrix that touches the pruned dimension
   and a retraining pass to recover.
-- **Combine, in Minitron order:** importance-rank → trim to
-  target size → distill-retrain (teacher = fine-tuned 2B,
-  see §6) → measure → repeat one axis at a time so the
-  experiment attributes the drop.
+- **First ladder:** importance-rank → prune depth → recover with
+  verified labels → measure. Change one axis at a time (§6).
 
-### 4.3 Knowledge distillation (the retraining step)
+### 4.3 Student recovery: verified labels first, KL as a separate arm
 
-Distillation trains a smaller student to match a larger
-teacher, not just hard labels but the teacher's logits /
-intermediate states. Hinton et al. (2015):
-https://arxiv.org/abs/1503.02531
-For MiniCut the teacher is already fine-tuned and the
-distillation data is grammar-generated, so the student
-never sees unlabelled general text — it sees only task
-inputs with teacher labels, which is exactly the distribution
-it will serve. One practical point the v1 spec glossed over:
-**teacher logits do not come out of llama.cpp.** The
-`llama-server` used for eval serves completions, not a
-logit distribution over the vocabulary. Logit distillation
-therefore needs the teacher in transformers/PyTorch (HF
-`openbmb/MiniCPM5-2B`, LoRA adapter merged first — see §1.1),
-run offline over the distillation prompts, with the logits
-saved to disk. If that pipeline is not built, the first
-distillation arm is hard-label-only by necessity, and the
-spec's "KL is the default" is aspirational. Say which arm
-was actually run in the log. Two styles to distinguish in the experiment:
+Train the first depth series with supervised hard labels from the verified
+core and reviewed templates. This controls the supervision independently
+of an imperfect teacher: it does not copy incorrect predictions or inherit
+an unmeasured teacher's uncertainty. Proofs constrain the executable edit
+label, not whether a template matches arbitrary natural language. Do not
+use teacher-generated hard labels as a drop-in replacement.
 
-- **Logit distillation (KL on the teacher's distribution):**
-  the student learns the teacher's uncertainty, including
-  near-miss cases (keep vs remove). This is the Minitron
-  retraining style and the right default.
-- **Hard-label fine-tuning on teacher outputs:** simpler, and
-  sufficient if the teacher is near-deterministic on the task
-  (greedy tool calls). Use it as a control, not the default,
-  because it throws away the teacher's uncertainty on
-  ambiguous inputs — the cases where clarify matters.
-
-Teacher correction (Minitron practice report, §1): if the
-teacher was not trained on the distillation data, fine-tune
-it on that data first, then prune/distill. For MiniCut the
-teacher *is* the fine-tuned model on grammar-generated data,
-so this step is already done — note it explicitly in the
-experiment log rather than repeating it.
+Optional later arm: add KL to the same hard-label objective with a pinned
+teacher and unchanged student/data/step budget. Start at `T=1` as an
+experimental default; preregister the loss weight and any temperature
+sweep. Compute teacher-forced logits offline on the same answer prefixes
+using HF/PyTorch (the current llama.cpp evaluation path does not capture
+full logits). Record masking, normalization, precision and artifact hashes.
+For compressed top-k caches, specify how omitted probability mass is
+handled and label the resulting loss approximate. Cache offline to avoid
+requiring both models resident on the 3090. No KL or cache build is assumed
+for the initial ladder. See Hinton et al., https://arxiv.org/abs/1503.02531.
 
 ### 4.4 Bits per parameter (quantisation, separate axis)
 
@@ -512,95 +440,66 @@ stacks with pruning:
 
 ## 5. What "minimum" means here (acceptance, before any training)
 
-No experiment under this spec starts until these are written
-down. The reviewer should fill in or correct the numbers:
+Use the pinned teacher (§1.1) and one pinned grader/runtime. Proposed
+acceptance policy, to approve **before** allocating GPU time:
 
-- **Primary metric:** intent accuracy on the frozen Phase 3
-  eval (4 splits × 50, seed 20261120), scored exactly as the
-  current baselines are scored — that is `intent_v2` /
-  `task_pass` (§1.1), not the historical verification-only
-  rate. Report per-split, per-tool, and the keep/remove confusion
-  separately — a student that keeps 95% overall but inverts
-  keep/remove is a failure, not a pass.
-- **Acceptance threshold (proposal, to confirm):** ≥95% intent
-  accuracy on frozen eval, with no per-tool regression vs the
-  2B teacher larger than 2 points on any of the 8 tools, and
-  no increase in the keep/remove inversion count. Clarify
-  behaviour is scored separately: a clarify on a genuinely
-  ambiguous input is correct; a clarify on an unambiguous
-  input is an error (over-clarifying, the failure mode the
-  near-miss sweep already saw).
+- **Development:** on the 200 frozen `intent_v2` cases, evaluate at least
+  three predeclared student seeds (start with 1–3). The mean may be at most
+  **4 cases (2 percentage points)** below the reference. Also apply that
+  margin to each seed as a stability guard; report the mean and range.
+- **Semantic guardrails:** no new keep/remove inversion on any seed
+  relative to the reference's case IDs; unnecessary clarifications no
+  higher than the reference on any seed. Report per-tool and per-split
+  counts and paired gains/regressions, not a 2-point per-tool cutoff on
+  buckets too small to resolve it. Review clarification wording separately
+  where it affects usability; `task_pass` grades the missing fields.
+- **Release:** use the independently authored 38-case pinned benchmark
+  as a separate gate on the finalist and reference, not for tuning or
+  choosing checkpoints. Run `python -m eval.release controls` first.
+  Require no new release intent failure or source-preservation failure
+  relative to the reference, and no source-preservation failure at all.
+  Report disagreements between the dev and release suites separately.
+- **Deployment:** report GGUF bytes, peak runtime RAM/VRAM, cold start,
+  time to first token and decode throughput at fixed context/offload and
+  on the agreed target. A smaller file alone is not a deployment win.
 
-### 5.1 Statistics: 200 cases is not enough to tell close students apart
+### 5.1 What the statistics can and cannot establish
 
-This was underspecified in v1 and it matters, because the
-proposed bar sits 1 case below the best tuned teacher
-(191/200). On 200 cases, a 95% Wilson interval around
-191/200 is roughly 91–98%; a 2-point per-tool bar is less
-than one case on most tools (per-tool counts in the frozen
-eval are uneven and small — see `eval/freeze.json`).
-A student at 190 and a student at 185 are not distinguishable
-on this eval alone, and a single seed can move a run by
-~15 points (verified v2 seed 1 collapsed to 175; see
-Appendix A). So:
+The margin is an operating rule, not a claim of statistical non-inferiority.
+Use the same case IDs per arm and report discordant case counts. Repeated
+prompts across splits are correlated, and three runs on the same 200 cases
+are not 600 independent observations. If reporting uncertainty, resample
+paired prompt groups (with all corresponding cases), report seed variation
+separately and label the interval exploratory; do not use overlap of
+unpaired Wilson intervals to infer equivalence. A borderline result merits
+more independent cases or seeds, not a retroactive change to the gate.
 
-- Report **paired** per-case differences against the teacher
-  on the same grader and the same server, not just two
-  headline percentages. A student that gains 5 and loses 5
-  is not the same as one that gains 0 and loses 0.
-- Report **seed-averaged** scores (seeds 1–3 at minimum, as
-  in the pilot board) with the range, not a single seed.
-  A student that passes on one seed and collapses on another
-  has not passed.
-- Report a **confidence interval** (Wilson, 95%) on the
-  headline number, and treat a student whose interval
-  overlaps the teacher's as "not distinguished", not "equal".
-- Use the **release benchmark** (`eval/release/`, 38 pinned
-  cases, controls 38/38, no model scored yet as of the base
-  commit) as a **co-primary**, not a secondary: it is
-  independently authored and frozen, so it guards against
-  overfitting to the dev splits. It is also small (38 cases),
-  so it is a guard, not a replacement — if dev and release
-  disagree, that disagreement is itself a finding to report,
-  not to average away.
-- If the reviewer wants a sharper bar, the honest options are
-  a larger frozen eval (a new frozen set, generated once and
-  then frozen — a real cost, and it must obey the same freeze
-  rules) or a lower acceptance bar with a stated margin
-  (e.g. "within 3 points of the teacher, paired, seed-averaged").
-  Do not sharpen the bar by re-reading the same 200 cases
-  more confidently.
-- **Secondary metrics:** release benchmark (`eval/release/`),
-  seed sweep (seeds 1–3, as in the pilot board), and a
-  held-out paraphrase split if one exists. General benchmarks
-  are not acceptance metrics.
-- **Deployment metrics (proposal):** GGUF bytes, RAM at
-  runtime, tok/s on the target machine (state the machine),
-  and cold-start time. A student that is smaller on disk but
-  slower at decode because of a shape llama.cpp dislikes is
-  not a win — measure it.
-- **Stop rule:** stop trimming when the fitted curve predicts
-  the next step down would breach the threshold, *and* one
-  step past the knee has been measured to confirm the knee
-  is real (one step of over-trimming, on purpose, with the
-  result recorded). Do not stop at the first size that passes.
+Name the smallest measured passing configuration and the next smaller
+measured failure, if any. If every measured size passes, report the lower
+end of the tested range; if none pass, report no bracket. Do not claim a
+universal minimum or require an extrapolated knee to stop.
 
 ## 6. The experiment: a student ladder
 
 ### 6.1 Data (fixed for all students)
 
-- Train: grammar-generated from the single source of truth
-  (`config/tools.yaml` + the Rust core's label function +
-  the phrasebook templates). Teacher labels come from the
-  fine-tuned 2B model; hard labels come from the verified core.
-  Record the generator commit, the seed, and the row counts.
-- Eval: frozen Phase 3 eval only, plus the release benchmark.
-  No new eval wording is introduced during the ladder —
-  that would move the target while measuring it.
-- Distillation set: the same prompts, with teacher logits
-  saved (temperature noted). If logits are not saved, say so;
-  hard-label-only runs are a different arm and must be
-  labelled as such.
+- **Training and layer ranking:** use versioned Rust-generated tool rows
+  with verified labels and reviewed templates; pin generator commit, template
+  pool, seeds, fixture distribution, mix and exact row hashes. Keep the
+  first ladder tool-only (including `clarify`). The historical 12% general
+  mix belongs to `train_v1.jsonl`, not the pilot data; any general mix is
+  a separate experiment.
+- **Loss holdout:** create a separate, frozen generated split with fresh
+  seeds and disjoint prompt groups from training, including held-out template
+  families where feasible. Check canonical prompt/target collisions as well
+  as template/fixture coverage; a different seed alone is not separation.
+- **Freeze:** enforce `eval/freeze.json` via `training.build_verified` and
+  audit against the pinned release corpus separately. Exclude both benchmark
+  rosters and their held-out shapes from training, layer ranking, checkpoint
+  selection, quantization calibration and any teacher-generated data or
+  logits. The development set measures the ladder; the release set is for
+  the finalist. A collision stops the experiment. Record checks and hashes
+  before any training; no changes to either benchmark under this spec.
 
 ### 6.2 Ladder (illustrative sizes — arithmetic, not results)
 
@@ -633,11 +532,9 @@ Then, at the best depth, one width step as a separate arm:
 | S2w | 24 | 3072 | ~28.3M | ~1.214B |
 | S2w2 | 24 | 2048 | ~22.0M | ~1.063B |
 
-**The ladder as written never goes below ~1.06B.** If the
-floor is 0.5B, this ladder cannot find it — it can only say
-"still passing at 1.06B". Extend it, as a second phase, with
-combined axes (depth + width, then + vocab), still arithmetic
-until measured:
+The initial depth-only ladder stops at S4 (~1.10B total). Width variants
+above and the combined variants below are illustrative follow-ups, not
+scheduled arms. Even if S4 passes, that does not establish a sub-1B result:
 
 | Student | Layers | Intermediate | Non-embedding | Total (full vocab) | Note |
 |---|---|---|---|---|---|
@@ -645,14 +542,8 @@ until measured:
 | S6 | 12 | 2048 | ~0.264B | ~0.799B | depth + width, narrower |
 | S7 | 8 | 3072 | ~0.226B | ~0.761B | depth + width, shallow |
 
-Sub-0.8B at full vocab is not reachable by depth+width
-alone without going very shallow; going below that needs
-vocab trimming as well (at, say, 32k vocab the embedding
-bill falls from 535M to ~134M, and S6's total falls to
-~0.40B). That is why vocab is a separate axis and why
-§4.1's feasibility question has to be answered before the
-second phase is scheduled — the sub-1B floor, if it exists,
-lives in the combined region, not on any single axis.
+All retain ~535M vocabulary parameters; vocabulary trimming is not needed
+to *specify* a sub-1B candidate, only a possible later way to save more.
 
 Per-layer width arithmetic: MLP at intermediate 3072 is
 3 × 2,048 × 3,072 = 18.9M; plus attention 9.4M = 28.3M/layer.
@@ -663,73 +554,52 @@ actual tensors before running anything — they are config
 arithmetic, and a wrong intermediate size in the table is a
 cheap error to catch now.
 
-Candidate control student (to check, not assumed): MiniCPM5-1B,
-the smaller sibling in the same series, as a from-scratch
-baseline at ~1B. Record its config and whether it shares the
-tokenizer before using it as a control. Do not assume it is
-the same architecture scaled down — check.
+An existing smaller pretrained model is a useful control, not a
+from-scratch baseline. MiniCPM5-1B availability, config, tokenizer and GGUF
+support are unverified; do not assume it exists or shares the tokenizer.
+If a compatible control is found, tune it on the same rows and score it
+under the same runtime contract. Do not mix its per-token loss into the
+MiniCPM depth fit if its tokenizer differs.
 
 ### 6.3 Procedure per student
 
-1. Rank and prune (Minitron order): importance-rank layers /
-   heads / MLP channels on task data, trim to target, record
-   exactly what was removed.
-2. Distill-retrain: teacher = named teacher (§1.1), student = pruned
-   model, KL distillation on the grammar-generated set plus
-   hard labels from the verified core. Record temperature,
-   epochs, LR, and tokens. Keep the LoRA-vs-full-FT choice
-   explicit: the teacher was LoRA-tuned; a pruned student
-   needs full fine-tuning of the surviving weights, not a
-   LoRA on top of a pruned base, unless the experiment says
-   otherwise and justifies it. **Feasibility note:** full FT
-   of a ~1–2B model with AdamW in bf16 needs roughly
-   2 bytes/param weights + 2 bytes/param grads + 8 bytes/param
-   Adam states ≈ 12 bytes/param, plus activations — ~24 GB
-   for a 2B model before activations, which is the whole of
-   the RTX 3090's 24 GB. The LoRA pilot used 7.12/16.84 GiB
-   peak allocated/reserved CUDA memory precisely because it
-   was LoRA. Full FT on that card therefore needs a stated
-   plan before it is scheduled: 8-bit Adam / Adafactor,
-   gradient checkpointing, a smaller student first, or a
-   different machine. Do not schedule a full-FT ladder
-   assuming LoRA memory.
-3. Convert to GGUF (same quant as the teacher's baseline,
-   F16 first, then Q4 as a separate arm), run in llama.cpp
-   with the same server, prompt, grammar, and decoding as
-   the baseline. Parity of runtime is part of the result.
-   **Pin the runtime in every run log:** llama.cpp commit
-   (pilots used `01818e495`), GGUF file and quant, server
-   flags (`--jinja`, context size), system prompt and
-   few-shot (identical to `minicut/llm/prompts.py`),
-   thinking off, greedy decoding, `temperature=1.0,
-   top_p=0.95, min_p=0.0` per the model card (llama.cpp
-   defaults `min_p=0.05` — set it to 0.0), and the GBNF
-   grammar file. A student scored under different decoding
-   is not comparable to the teacher.
-4. Score frozen eval + release benchmark + seed sweep.
-   Record per-tool, keep/remove, and clarify behaviour.
-5. Fit `L_task(N) = E_task + A_task / N^α_task` to the
-   points so far. After 3 points, publish the fitted
-   `E_task`, `A_task`, `α_task` and the predicted `N_min`
-   for the §5 threshold. Update the fit after each new point.
-   If the fit is unstable (fewer than 3 points, or a point
-   far off the curve), say so — do not extrapolate from 2 points.
+1. Rank layers on the calibration/training side of §6.1, not the frozen
+   eval. Pin the layer selection method and exact retained indices. Start
+   with S2 (24 layers) as a smoke test, not a promoted result.
+2. Recover with verified hard-label SFT under one pinned recipe and seed
+   roster. Full FT is optional, not a prerequisite. Choose the memory plan
+   **before** the timed smoke; if full FT does not fit, try activation
+   checkpointing, a memory-efficient optimizer, or a separately labelled
+   LoRA recipe on all compared depths. BF16 weights and gradients plus
+   FP32 Adam moments alone can use ~12 bytes/parameter before activations,
+   allocator overhead or master weights. The measured LoRA pilot's memory
+   does not justify a full-FT run on a 24 GiB 3090.
+3. Export to GGUF at the same quantization as the reference (Q4_K_M for the
+   existing runtime); measure F16 or Q3 separately, with a same-quant
+   reference. Pin llama.cpp revision, GGUF/grammar/prompt hashes, server
+   flags, context/offload, thinking state and actual sampler parameters.
+   Existing pilots used revision `01818e495` and `temperature=0.0`
+   (`minicut/llm/client.py`); the model card's sampling recommendations
+   are not the pilot configuration.
+4. Measure held-out loss and evaluate on the pinned paired dev roster.
+   Expand only after the smoke confirms export, memory headroom and cost.
+   The existing 100-step LoRA pilots took about 8.5 min each including
+   conversion and both eval arms; this is not a full-FT estimate. Proposed
+   first allocation is one S2 smoke capped at 100 updates and 30 minutes
+   wall time (including conversion and dev eval). Then forecast the cost
+   of the 4 depths × 3 seeds from measured throughput, peak VRAM and
+   eval runtime; get approval for the remaining GPU-hours before queuing.
+5. Apply §5. Report a measured bracket if found; fit §2.2 only when data
+   supports it. Use the independent release benchmark only for the
+   nominated finalist and the pinned reference.
 
 ### 6.4 What success looks like
 
-- A fitted task scaling law with at least 4 student points
-  on a single axis (depth first), a stated `E_task`, and a
-  predicted `N_min` that the next measured point confirms
-  within its error bars. Width and vocab points are fitted
-  separately, not pooled into the depth curve (§6.2).
-- A smallest passing student, named, with its GGUF bytes,
-  tok/s, and per-tool scores, and one measured failing
-  student one step smaller, so the knee is bracketed, not
-  guessed.
-- A short note on which axis paid most: vocab, depth, width,
-  or bits. That note is the transferable result for lilguy
-  and for the next expert in the family — it is not a
-  MiniCut-only curiosity.
+- A smallest passing tested student (or an explicit no-pass result), a
+  measured bracket if possible, and paired case counts, seed range and
+  deployment measurements.
+- A reproducible comparison that changes depth alone. Any curve is a
+  secondary descriptive result; an unidentifiable fit is not a blocker.
 
 ## 7. Role of the grammar / Verus core in the floor
 
@@ -742,9 +612,8 @@ general model's floor, and it should be measured, not asserted:
    training corpus. The phrasebook (`docs/plans/2026-11-25-phrasebook.md`)
    and the template table (`docs/templates.md`) are the
    artefacts to measure against.
-2. **The output grammar removes syntax learning.** The model
-   never has to learn JSON shape, field names, or arg types —
-   GBNF enforces them. The ablation that proves this is cheap
+2. **The output grammar removes syntax learning.** GBNF constrains JSON shape, field names and arg types at inference; it
+   does not choose the intended tool or ensure correct arguments. The ablation that proves this is cheap
    and worth doing once: score the same student with the
    grammar on vs off (or with a looser grammar). If the gap
    is large, the grammar is doing work the model would
@@ -758,8 +627,7 @@ general model's floor, and it should be measured, not asserted:
    a single "wrong" bucket.
 3. **The verified core removes label noise.** Training labels
    come from `try_label` and its siblings, not from a human
-   or a bigger model guessing. That lowers `E_task` directly:
-   a cleaner corpus has a lower irreducible loss. If a
+   or a bigger model guessing. This can reduce label noise; it does not establish a lower `E_task`. If a
    student plateaus, check label noise before blaming size.
 
 ### 7.3 Single-source generation is the dependency, not the premise
@@ -789,55 +657,25 @@ stop-the-ladder event, not a footnote.
    rate alongside accuracy for every student; a student that
    "passes" by over-clarifying has not passed.
 
-## 8. Open questions for the reviewer
+## 8. Review decisions and launch prerequisites
 
-1. Acceptance threshold (§5, §5.1): is ≥95% on `intent_v2`
-   with the per-tool and keep/remove conditions right, or
-   should the bar be the named teacher's `intent_v2` score
-   exactly (not the historical 95.5% verification-only rate,
-   which is not comparable — §1.1)?
-2. Vocab trimming in GGUF/llama.cpp: feasible cleanly, or
-   deferred? What is the exact output-token set (§4.1)?
-3. First ladder: depth-only as in §6.2, or start with a
-   vocab-trim + depth combined arm? What GPU budget is
-   available for the ladder (each student is a distill +
-   eval run)?
-4. Distillation loss: KL with what temperature, and is the
-   teacher's logit distribution saved, or only hard labels?
-   (Logits need a transformers teacher, not llama.cpp — §4.3.)
-5. MiniCPM5-1B as a control student: check config/tokenizer
-   first — is it a valid control?
-6. LoRA vs full fine-tuning for the pruned student (§6.3 step 2):
-   is full FT of the surviving weights the plan?
-7. Deployment target: which machine / RAM / latency is the
-   student actually for? That decides whether GGUF bytes or
-   tok/s is the binding constraint.
-8. Is there a smaller teacher worth distilling from first —
-   e.g. would a 1B teacher's floor be a better starting point
-   than pruning the 2B directly?
-9. **Teacher (§1.1):** stock, merged verified-v1 LoRA, or a
-   fresh teacher with a seed sweep? Which one is the ladder
-   measured against?
-10. **Clarify (§4.1):** templated clarify (core generates the
-    question, model outputs tool + `missing` only) or English
-    output head kept? And is the 12% general mix kept in
-    distillation data, dropped, or kept as a separate arm?
-11. **Statistics (§5.1):** paired + seed-averaged + Wilson
-    interval + release benchmark as co-primary — accepted?
-    Or is a larger frozen eval worth building first?
-12. **Full FT on the 3090 (§6.3):** 8-bit Adam, gradient
-    checkpointing, a smaller student first, or a different
-    machine? What is the memory plan?
-13. **Ladder range (§6.2):** is the second phase (S5–S7,
-    combined axes, sub-1B) in scope for this round, or does
-    the first phase stop at S4 and report "still passing
-    at 1.06B"?
+The proposal adopts teacher-relative acceptance (§5), verified hard-label
+SFT first (§4.3), and a full-vocabulary, depth-only first phase (§6).
+Vocab surgery, a clarify contract change, KL, mixed general-text training,
+width and sub-1B arms are deferred. The smaller pretrained checkpoint is
+an optional independent control, not a teacher prerequisite.
+
+Still required before using the GPU: approve the numerical margin and
+stability guard; qualify and pin the reference teacher; approve the first
+smoke and the memory recipe, then approve remaining GPU-hours after the
+smoke. Confirm the deployment target and whether RAM or latency is the
+binding budget before promoting a winner. A doc merge is not authorization
+to start training.
 
 ## Appendix A. Context the reviewer needs without hunting the repo
 
-This appendix is background, not a decision. It records where
-MiniCut stood at the base commit, so the spec's claims can be
-checked without re-reading the whole history.
+This appendix is background, not a decision. It distinguishes the base
+commit from later experimental branches and locally verified runs.
 
 ### A.1 Pilot board (intent_v2, 200 cases, stock 167/200 in every run)
 
@@ -851,25 +689,23 @@ checked without re-reading the whole history.
 | verified v2 | 1 | 175 | 18 / 10 | 49 | — | 18 | Fail |
 | verified v2 | 2 | 190 | 25 / 2 | 62 | — | 1 | Pass |
 | verified v2 | 3 | 190 | 25 / 2 | 62 | — | 2 | Pass |
-| verified v3 (near-miss) | 1 | 182 | — | — | none | 7 | — |
-| verified v3 (near-miss) | 2 | 191 | — | — | none | 1 | — |
-| verified v3 (near-miss) | 3 | 180 | — | — | none | 13 | — |
+| verified v3 (near-miss) | 1 | 182 | 23 / 8 | 54 | — | 7 | Pass |
+| verified v3 (near-miss) | 2 | 191 | 26 / 2 | 62 | — | 1 | Pass |
+| verified v3 (near-miss) | 3 | 180 | 24 / 11 | 57 | — | 13 | Pass |
+| verified v4 (phrasebook) | 1 | 180 | 17 / 4 | 56 | paraphrase-012 | 8 | Fail |
+| verified v4 (phrasebook) | 2 | 186 | 25 / 6 | 58 | — | 1 | Pass |
+| verified v4 (phrasebook) | 3 | 186 | 23 / 4 | 61 | paraphrase-014 | 7 | Fail |
+| verified v5 (short clarify) | 1 | 179 | 19 / 7 | 62 | — | 13 | Pass |
+| verified v5 (short clarify) | 2 | 188 | 24 / 3 | 60 | paraphrase-012, -014 | 1 | Fail |
+| verified v5 (short clarify) | 3 | 192 | 27 / 2 | 62 | — | 0 | Pass |
 
-Readings from `eval/PILOT_BOARD.md`: verified labels remove
-the keep/remove inversion at every seed (0/7 runs vs 4/4 for
-v1 data) but trade it for over-clarifying on weak seeds; the
-near-miss pairs (v3) did not stabilise it (two weak seeds of
-three). The failure concentrates on one wording: the dev case
-"cut the first 10 seconds off clip.mp4" (expected cut_out,
-4 dev cases) flips to clarify in every weak verified run —
-it is one word from the ambiguous template `v3_amb_cut_first`
-("cut the first N seconds **of** X"). The phrasebook plan
-(§1) is the proposed fix: define that wording out of the
-ambiguous table rather than teaching a one-letter distinction
-at 100 updates. LoRA recipe throughout: rank 16 / alpha 32,
-100 updates, microbatch 2 × accumulation 2, ~112–128 s on the
-RTX 3090, PyTorch peak 7.12/16.84 GiB. Stock and tuned served
-the same Q4_K_M base with llama.cpp `01818e495`.
+V4 and v5 results are post-base-commit evidence from the phrasebook and
+short-clarify branches respectively. V5 boards were re-verified on CPU
+from `training/output/sweep-verified_v5-s{1,2,3}/`. Neither recipe has
+consistent inversion and clarification behavior across its seed sweep.
+The pilots used 100 updates with LoRA rank 16 / alpha 32 and microbatch
+2 × accumulation 2; stock and tuned served the same Q4_K_M base with
+llama.cpp `01818e495`.
 
 ### A.2 Training data v1 (3000 examples)
 
@@ -907,9 +743,9 @@ commit. See `eval/README.md`, `eval/freeze.json`,
 ### A.4 Template drift, twice
 
 - `isolate`: 26/26 training corpus rows meant
-  `extract_audio`, but 3 eval cases meant `trim`. All 3
-  pilot regressions in the first LoRA pilot were this
-  template mismatch, not model capacity.
+  `extract_audio`, but 3 eval cases meant `trim`. One regression in the
+  first LoRA pilot was an inversion on an `isolate` prompt; the other
+  two were scale regressions. This does not isolate model capacity.
 - `720p`: 0 occurrences in training, eval expects
   1280×720 twice; both scale regressions in the first
   pilot were this.
@@ -937,14 +773,10 @@ merges herself.
 ### A.6 What "stock stays default" means in practice
 
 At the base commit there is no promoted tuned adapter.
-Any pruning experiment that assumes a tuned teacher must
-first promote (or re-train) one and record it (§1.1).
-Any experiment that assumes the phrasebook must first
-implement it (§1). Any experiment that assumes a
-single-source generator must first build it (§7.3).
-Those three are the spec's hidden prerequisites — this
-appendix names them so the reviewer can sequence them
-instead of discovering them mid-ladder.
+Qualify a reference without changing the deployment default (§1.1).
+The phrasebook exists on its experiment branch; the v4/v5 results do not
+qualify either recipe. The first ladder does not require a new single-source
+generator; it requires the explicit freeze and drift checks in §6.1.
 
 ## 9. References
 
