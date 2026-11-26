@@ -24,7 +24,11 @@
   - "cut the first N seconds of X" is a cut. No keep/remove ambiguity rows remain.
   - `minicut --help` prints the phrasebook.
   - `train_verified_v4`: all acceptance checks PASS, and the phrasebook agrees with all 674 trim/cut labels.
-- **Next:** GPU sweep `DATASETS=verified_v4 scripts/seed_sweep.sh` (seeds 1–3, ~25 min), waiting on Ivy's go (GPU busy).
+- **Phrasebook sweep (v4, seeds 1–3): 180 / 186 / 186, mean 184.0** (v1 data 189.3, v2 185.0, v3 184.3).
+  - It did not help, and inversions returned at 2 of 3 seeds.
+  - The new unsupported rows (all offering "mute X") spread to real mute requests.
+  - Across versions, only verified data over-clarifies (v1: 0/0/0). Its clarify targets are twice as long and always quote a full tool request ("For example: …"); that is the leading hypothesis.
+- **Next (decision):** v5 = short v1-style clarify questions plus only the v1 "make X quiet" row, then sweep.
 
 ## Rust port, Phase 3: plan notes
 
