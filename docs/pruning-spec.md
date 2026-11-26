@@ -18,10 +18,12 @@ asks is:
 > and trim MiniCPM5-2B down to literally the smallest size that can
 > still operate — and if so, how, concretely, with this base model?
 
-Short answer, up front: the *exact* floor is not computable, but a
-*usable* floor is measurable. This spec defines what "usable" means,
-what to measure, and the experiment that finds it. It does not claim
-a number in advance.
+This first phase asks a narrower, measurable question: what is the
+smallest **tested depth** that passes at full vocabulary, fixed width
+and a fixed recovery recipe? The ladder stops at S4 (~1.10B total).
+It does not establish a global minimum over vocabulary, width,
+quantization or training budgets. Those are follow-up axes, not
+scheduled arms.
 
 ## 1. What MiniCut is now (ground truth for this spec)
 
@@ -56,7 +58,8 @@ a number in advance.
   be conflated (see §1.1): the historical verification-only
   baselines (v2 94.5%, v3 95.5%, 191/200) and the current
   `intent_v2` / `task_pass` scoring, on which stock is 167/200
-  and the best tuned pilot is 191/200 on one seed. Do not touch
+  and the best observed tuned pilot is 192/200 (v5 seed 3), not a
+  qualified reference score. Do not touch
   the frozen eval inputs in any experiment under this spec.
   See `eval/freeze.json`, `eval/PILOT_BOARD.md`, `PROGRESS.md`.
 - Training data: generated from templates, with labels from the
@@ -65,7 +68,7 @@ a number in advance.
   `eval/generate_eval.py` still have separate hand-written
   templates and do not read `config/tools.yaml`; the
   dictionary-as-generator work that would make them one source
-  is not yet built (see §7.3 and Appendix A). The claim in §6
+  is not yet built (see §7.1 and Appendix A). The claim in §6
   that distillation data is "free, exact, and unlimited"
   therefore depends on that unbuilt work plus the freeze rules
   in `eval/README.md` (held-out template ids, reserved fixture,
@@ -108,7 +111,10 @@ things:
     **pass / fail / pass**. Seed 2 added two inversions. V5 also reshuffled
     the tool sample (1,261 of 2,009 tool rows shared with v4), so this is
     not an isolated test of question length. See Appendix A and
-    `eval/PILOT_BOARD.md`. Stock remains the deployment default.
+    `eval/PILOT_BOARD.md`. Stock remains the deployment default. V3 passed the pilot gate at
+    all three tested seeds, making it a reference candidate, not an
+    adopted reference. Its range was 180–191 and it has not been
+    qualified on the release benchmark.
 
 There is no accepted tuned teacher. Before scheduling the ladder, select a
 2B recipe that passes the existing pilot gate at each of at least three
@@ -185,13 +191,10 @@ it is *generalising* the mapping from unseen phrasings. A
 counting bound is therefore weak by orders of magnitude, and
 this spec does not use one as a target.
 
-What *is* computable is an empirical floor, defined in §5:
-the smallest student size whose frozen-eval accuracy stays
-above an agreed threshold, with the scaling law fitted to
-that task. The true theoretical floor lies below that number
-by an unknown training-inefficiency gap. This spec treats the
-empirical floor as the shippable answer and the theoretical
-floor as the direction of travel, not a number to claim.
+What *is* measurable is a tested bracket under §5: the smallest
+observed passing depth and, if tested, the next smaller failing
+configuration. A fit on held-out loss (§2.2) can describe the trend,
+but neither establishes the bracket nor determines what ships.
 
 ### 2.2 The scaling-law form to fit
 
@@ -268,30 +271,19 @@ Per-layer arithmetic (from the config, before any training):
   down 6,144×2,048 = 12.58M; total ≈ 37.7M (~80% of the layer).
 - Check: 9.4M + 37.7M ≈ 47.1M, matching the 47.2M above.
 
-Implications, in order of payoff:
+Implications for the first ladder:
 
-1. **Vocabulary is the biggest free win — with the §4.1 caveat.**
-   535M params, and the lm_head is also the decode bottleneck:
-   every generated token reads all 267M lm_head parameters in a
-   memory-bandwidth-bound decode loop. MiniCut's *tool-call-only*
-   vocabulary is tiny — tool names, numbers, punctuation, a few
-   enums — on the order of 200 tokens. The *actual* output
-   vocabulary as trained is larger, because clarify questions
-   are free-text English and 12% of training is general
-   plain-text replies (see §4.1). The vocab saving is real
-   either way; its size depends on the clarify decision in §4.1.
-   See §4.1.
-2. **MLP width is next.** The MLP is ~80% of every layer, so
-   cutting intermediate 6144 → 3072 halves the bulk of the model.
-3. **Depth is next.** Each layer is ~47M non-embedding. 42 → 24
-   layers saves ~850M non-embedding params before any other change.
-4. **Quantisation is orthogonal.** F16 (5.03 GB) → Q8 → Q4 halves
-   bytes per step with no architecture change. MiniCut already
-   runs the F16 GGUF in llama.cpp; Q4_K_M is the usual local
-   form. BitNet-style ternary weights (1.58 bits/param) are a
-   further step, but they require training from scratch with
-   quantisation in the loop, not post-training quantisation —
-   see §4.4 and the BitNet reference below.
+1. **Depth is the first controlled variable.** Each layer is ~47M
+   non-embedding parameters; 42 → 24 saves ~850M at fixed width and vocab.
+2. **Width is a later axis.** The MLP is ~80% of each layer, so reducing
+   intermediate width from 6144 to 3072 halves the MLP, not the whole model.
+3. **Vocabulary is a large fixed cost, not a free saving.** The two
+   vocabulary matrices total ~535M parameters. Trimming them is deferred
+   because tokenizer IDs and GGUF tensor shapes must agree (§4.1).
+4. **Quantization is separate.** The recorded pilots use Q4_K_M in
+   llama.cpp; 5.03 GB is the approximate 16-bit weight payload, not the
+   deployed GGUF size. Compare any new quantization with its own
+   same-quant reference (§4.4).
 
 ## 4. Trimming levers, in order
 
@@ -440,22 +432,31 @@ stacks with pruning:
 
 ## 5. What "minimum" means here (acceptance, before any training)
 
-Use the pinned teacher (§1.1) and one pinned grader/runtime. Proposed
-acceptance policy, to approve **before** allocating GPU time:
+Use one pinned teacher **artifact** (§1.1), not a seed average or a
+different teacher per seed. Save its per-case verdicts, inversion case
+IDs and unnecessary-clarification count with the artifact hash and
+grader/runtime identifiers; every student seed compares to that same
+record. Proposed acceptance policy, to approve **before** allocating GPU time:
 
 - **Development:** on the 200 frozen `intent_v2` cases, evaluate at least
   three predeclared student seeds (start with 1–3). The mean may be at most
   **4 cases (2 percentage points)** below the reference. Also apply that
   margin to each seed as a stability guard; report the mean and range.
+  For illustration, a pinned reference scoring 192 would set a floor
+  of 188 for both the mean and each seed. The relative rule deliberately
+  replaces the old 190-case absolute bar; 192 is not a selected reference.
 - **Semantic guardrails:** no new keep/remove inversion on any seed
-  relative to the reference's case IDs; unnecessary clarifications no
-  higher than the reference on any seed. Report per-tool and per-split
+  (the student's inversion IDs must be a subset of the reference's);
+  each seed's unnecessary-clarification count must not exceed the
+  fixed reference count. Report per-tool and per-split
   counts and paired gains/regressions, not a 2-point per-tool cutoff on
   buckets too small to resolve it. Review clarification wording separately
   where it affects usability; `task_pass` grades the missing fields.
 - **Release:** use the independently authored 38-case pinned benchmark
   as a separate gate on the finalist and reference, not for tuning or
-  choosing checkpoints. Run `python -m eval.release controls` first.
+  choosing checkpoints. Run `python -m eval.release controls --report
+  "$TMPDIR/release-controls.json"` first and keep the report (use a writable
+  scratch directory for `TMPDIR`).
   Require no new release intent failure or source-preservation failure
   relative to the reference, and no source-preservation failure at all.
   Report disagreements between the dev and release suites separately.
@@ -507,7 +508,7 @@ Depth-only first, because it is the cleanest attribution.
 All sizes below are arithmetic from §3 (47.2M non-embedding
 per layer, 535M embeddings at full vocab), before any training.
 Vocab is held at full size in this table so depth is the only
-variable; vocab trimming is a separate axis (§4.1, §7).
+variable; vocab trimming is a separate axis (§4.1).
 **`N` in the fit is non-embedding parameters** (§2.2); the
 table gives total as well so the two are never confused.
 Depth points and width points must be fitted as **separate
@@ -586,7 +587,11 @@ MiniCPM depth fit if its tokenizer differs.
    The existing 100-step LoRA pilots took about 8.5 min each including
    conversion and both eval arms; this is not a full-FT estimate. Proposed
    first allocation is one S2 smoke capped at 100 updates and 30 minutes
-   wall time (including conversion and dev eval). Then forecast the cost
+   wall time (including conversion and dev eval). This checks export,
+   memory headroom and throughput; the dev score is diagnostic only.
+   A low smoke score can reflect undertraining and is not evidence that
+   24 layers are insufficient. Pin the actual recovery budget before
+   drawing conclusions from the ladder. Then forecast the cost
    of the 4 depths × 3 seeds from measured throughput, peak VRAM and
    eval runtime; get approval for the remaining GPU-hours before queuing.
 5. Apply §5. Report a measured bracket if found; fit §2.2 only when data
@@ -630,7 +635,14 @@ general model's floor, and it should be measured, not asserted:
    or a bigger model guessing. This can reduce label noise; it does not establish a lower `E_task`. If a
    student plateaus, check label noise before blaming size.
 
-### 7.3 Single-source generation is the dependency, not the premise
+4. **Clarify is a capacity valve.** Every genuinely ambiguous
+   input that becomes a clarify instead of a forced guess
+   removes a bit of entropy the model would otherwise have
+   to resolve by memorising a convention. Report the clarify
+   rate alongside accuracy for every student; a student that
+   "passes" by over-clarifying has not passed.
+
+### 7.1 Single-source generation is not a prerequisite
 
 The grammar-from-dictionary idea — one dictionary source
 generating both training rows and eval cases, so training/eval
@@ -650,12 +662,6 @@ prompt/label collision checks — the dataset tests already
 do the last of these). Record the generator version with
 every dataset, and treat a drift check failure as a
 stop-the-ladder event, not a footnote.
-4. **Clarify is a capacity valve.** Every genuinely ambiguous
-   input that becomes a clarify instead of a forced guess
-   removes a bit of entropy the model would otherwise have
-   to resolve by memorising a convention. Report the clarify
-   rate alongside accuracy for every student; a student that
-   "passes" by over-clarifying has not passed.
 
 ## 8. Review decisions and launch prerequisites
 
@@ -700,12 +706,38 @@ commit from later experimental branches and locally verified runs.
 | verified v5 (short clarify) | 3 | 192 | 27 / 2 | 62 | — | 0 | Pass |
 
 V4 and v5 results are post-base-commit evidence from the phrasebook and
-short-clarify branches respectively. V5 boards were re-verified on CPU
-from `training/output/sweep-verified_v5-s{1,2,3}/`. Neither recipe has
-consistent inversion and clarification behavior across its seed sweep.
+short-clarify branches respectively. Neither recipe has consistent
+inversion and clarification behavior across its seed sweep. In the frozen
+`eval/eval_unseen_paraphrase.jsonl`, `eval_unseen_paraphrase-012` is
+“clip.mp4 without the part from 5 to 10 seconds” and
+`eval_unseen_paraphrase-014` is “take the 0 to 5 second bit out of
+clip.mp4”; these match the v4 pilot-board descriptions.
 The pilots used 100 updates with LoRA rank 16 / alpha 32 and microbatch
 2 × accumulation 2; stock and tuned served the same Q4_K_M base with
 llama.cpp `01818e495`.
+
+#### Sweep provenance (v3–v5)
+
+The nine runs below were rechecked on CPU with
+`python -m training.factory board --run training/output/<run>`.
+The board recomputes the gate from the stored graded rows; unnecessary
+clarifications come from `unnecessary_clarifications.final` in the
+comparison report. These are local artifacts, not files shipped in the
+PR. The relative paths and SHA-256 hashes pin the exact reports behind
+the Appendix A figures; rechecking the original runs requires access to
+those artifacts.
+
+| Run under `training/output/` | SHA-256 of `<run>/comparison.json` |
+|---|---|
+| `sweep-verified_v3-s1` | `9da70a6aae418ab47f6429b8d9cf096f711a28a43f2df687478d00cc7e639a64` |
+| `sweep-verified_v3-s2` | `3fd29e884e946daa3d408215f01941ea19759e770235808b7b751a6d7191b05f` |
+| `sweep-verified_v3-s3` | `90944e9e9a54ebbdb00b41cab36e5ba19433b74178e69fe545fcf0ff3e58c536` |
+| `sweep-verified_v4-s1` | `9e712b2924d7b6ca7ade17c9408f045bc0c31ad9580d79bba05ec00545846ac4` |
+| `sweep-verified_v4-s2` | `833e96ba3065642a4fd2fd97ec4a202dafaaf8c3aee4ca1a9fdc48704985609e` |
+| `sweep-verified_v4-s3` | `dd408f875a52edc8a5dd9d666f5126d672e72b3a12641ec92f861f99fb113d83` |
+| `sweep-verified_v5-s1` | `aba92aede2134615e86ed447cb17c84ca22d13f5ac990d408a209eda97e2915a` |
+| `sweep-verified_v5-s2` | `f6854ffd94a64dd93804b0c416fd70bd141135555e7057f59f885707e78065dc` |
+| `sweep-verified_v5-s3` | `6deaf71548e61815e89166fef6c7699c185fa44dce3c17f77dc7325780a835e2` |
 
 ### A.2 Training data v1 (3000 examples)
 
@@ -750,7 +782,7 @@ commit. See `eval/README.md`, `eval/freeze.json`,
   1280×720 twice; both scale regressions in the first
   pilot were this.
 Fix is contrast pairs in the generator / a single-source
-generator (§7.3), not more updates on the same corpus.
+generator (§7.1), not more updates on the same corpus.
 
 ### A.5 Rust / Verus core, in one paragraph
 
