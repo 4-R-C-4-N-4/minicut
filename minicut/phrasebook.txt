@@ -1,0 +1,36 @@
+How to ask (the MiniCut phrasebook)
+
+Keep or remove part of a clip: say what stays, or say what goes.
+  KEEP   (the result)  keep only 2 to 8 seconds of clip.mp4
+                       trim clip.mp4 to the first 10 seconds
+                       cut clip.mp4 down to 5-15 seconds
+                       give me just the first 5 seconds of clip.mp4
+  REMOVE (a part)      cut the first 10 seconds off clip.mp4
+                       remove 2 to 8 seconds from clip.mp4
+                       drop seconds 2 through 8 of clip.mp4
+
+  Keep words: keep, only, just, isolate, give me; or "to" / "down to" / "from" right after "trim X" or "cut X".
+  Remove words: cut, snip, remove, delete, drop, take, without ("cut ... of" and "cut ... off" mean the same).
+  Without times ("trim clip.mp4"), MiniCut asks for them.
+  Give times in seconds (7.5) or as m:ss (1:05). Percentages and "the last N
+  seconds" are not supported yet: give the start and end.
+
+Other edits:
+  join     join, concatenate, merge, append, put N copies together, loop, ... in a row
+           e.g. "join clip.mp4 to itself"
+  resize   make X WxH, resize X to W by H, scale X up/down to WxH
+           e.g. "make clip.mp4 1280x720"
+  speed    run/play X at Nx speed, make X N times as fast, speed X up by N%, slow X to N% speed
+           e.g. "run clip.mp4 at 2x speed"
+  convert  convert / re-encode / save X ... CONTAINER ... CODEC
+           e.g. "convert clip.mp4 to mkv with libx264"
+  audio    extract / save / pull / get the audio (soundtrack, mp3) from X as FORMAT
+           e.g. "extract the audio from clip.mp4 as mp3"
+  mute     mute, silence, remove/drop/strip the audio from X, make X silent
+           e.g. "mute clip.mp4"
+
+Not supported (MiniCut asks and offers the nearest edit):
+  "make X quiet": cannot lower the volume; offers "mute X"
+  "make X quieter": cannot lower the volume; offers "mute X"
+  "lower the volume of X": cannot lower the volume; offers "mute X"
+  "turn the sound down in X": cannot lower the volume; offers "mute X"

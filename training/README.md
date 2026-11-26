@@ -244,3 +244,19 @@ Checks format, exact system prompt, JSON labels, clarify missing
 lists, mix proportions, and freeze compliance re-derived from
 `eval/freeze.json` (no held-out template id, no reserved fixture, no
 combo-pool arg, no eval case sampled, no held-out prompt wording).
+
+## Verified dataset v4 (phrasebook)
+
+`train_verified_v4` applies the phrasebook (`docs/plans/2026-11-25-phrasebook.md`, `minicut --help`):
+- keep vs remove follows one rule, so there are no keep-or-remove clarify rows;
+- clarify is 280 missing-argument + 30 unsupported-request rows.
+
+Reproduce:
+
+    cargo build --release
+    target/release/minicut label --seed 20261124 --oversample 100 --out $TMPDIR/c.jsonl --meta $TMPDIR/cm.jsonl
+    python -m training.build_verified --rows $TMPDIR/c.jsonl --meta $TMPDIR/cm.jsonl --out training \
+        --targets training/verified_targets.json --name train_verified_v4
+    mv training/stats.json training/train_verified_v4_stats.json
+
+SHA-256 `6e55c920011f17f353d1811ff148c1e1b6bdbfb5fced73cbe66dc27b95bb92fe`. All five `scripts/accept_dataset.py` checks PASS.

@@ -284,14 +284,7 @@ pub fn markdown() -> String {
     s
 }
 
-/// Question for reading-ambiguous wording: both readings, as our phrasings
-/// with the user's own numbers ("Do you want to keep only the first 7.5
-/// seconds of clip.mp4, or remove the first 7.5 seconds of clip.mp4?").
-pub fn reading_question(first: &str, second: &str) -> String {
-    format!("Do you want to {first}, or {second}?")
-}
-
-/// Question when the other reading is something MiniCut cannot do.
+/// Question for a request MiniCut cannot do: offer a supported edit.
 pub fn unsupported_question(supported: &str, unsupported: &str) -> String {
     format!("Do you mean \"{supported}\"? I can't {unsupported}.")
 }
@@ -393,13 +386,6 @@ mod tests {
             q,
             "Do you want to keep only part of clip.mp4 or cut part of it out? Tell me the start and end times. \
              For example: \"keep only START to END seconds of clip.mp4\" or \"remove START to END seconds from clip.mp4\"."
-        );
-        assert_eq!(
-            reading_question(
-                "keep only the first 7.5 seconds of clip.mp4",
-                "remove the first 7.5 seconds of clip.mp4"
-            ),
-            "Do you want to keep only the first 7.5 seconds of clip.mp4, or remove the first 7.5 seconds of clip.mp4?"
         );
         assert_eq!(
             unsupported_question("mute clip.mp4", "lower the volume"),

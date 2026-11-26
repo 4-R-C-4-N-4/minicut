@@ -34,6 +34,7 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 | `v3_keep_first` | KeepFirst | Secs | Always | text | keep only the first {b} seconds of {file} | canonical KeepFirst phrasing |
 | `v3_keep_first_pct` | KeepFirst | Pct | Always | probe | keep only the first {pct} of {file} | 'keep only' makes the percentage unambiguous |
 | `v3_remove_first` | RemoveFirst | Secs | Always | text | remove the first {b} seconds of {file} | 'remove' names what goes |
+| `v4_cut_first_of` | RemoveFirst | Secs | Always | text | cut the first {b} seconds of {file} | phrasebook rule 2: a part named after 'cut' is removed; 'of' and 'off' mean the same |
 | `v3_remove_first_pct` | RemoveFirst | Pct | Always | probe | cut the first {pct} off {file} | 'cut ... off' removes (v1 train_cut_x_pct wording) |
 | `v3_keep_last` | KeepLast | Secs | Always | probe | keep only the last {a} seconds of {file} | canonical KeepLast phrasing ({a} is the kept length) |
 | `v3_keep_last_pct` | KeepLast | Pct | Always | probe | keep only the last {pct} of {file} | 'keep only' makes the percentage unambiguous |
@@ -101,19 +102,14 @@ clip's duration or size (`probe`). Only `text` rows are used for tool labels.
 | `train_concat_x4` | Concat | NoTime | Always | text | loop {file} {times} | {times} is twice/three times |
 | `train_concat_x5` | Concat | NoTime | Always | text | make a video with {file} {times} in a row |  |
 
-## Ambiguous wording: always a clarify, never a label (P3-D11)
+## Unsupported requests: always a clarify offering a supported edit (phrasebook rule 4)
 
-Each clarify row is emitted next to its near-miss partners (same file, and the same seconds
-when both use seconds), so the model learns the decision from the wording.
-
-| id | wording | numbers | first reading | other reading | near-miss partners | why |
-|---|---|---|---|---|---|---|
-| `v3_amb_trim_first_pct` | trim the first {pct} of {file} | Pct | KeepFirst | flip (keep ↔ remove, same span) | `trim_t5` trim {file} to the first {b} seconds (KeepFirst); `v3_remove_first` remove the first {b} seconds of {file} (RemoveFirst) | v1 labelled this keep-first; 'trim the first 25%' is read both ways |
-| `v3_amb_trim_last_pct` | trim the last {pct} of {file} | Pct | KeepLast | flip (keep ↔ remove, same span) | `trim_t3` keep only {a} to {b} seconds of {file} (KeepRange); `cut_t2` remove {a} to {b} seconds from {file} (RemoveRange) | same as above, at the end |
-| `v3_amb_trim_first_half` | trim the first half of {file} | NoTime (50%) | KeepFirst | flip (keep ↔ remove, same span) | `trim_t5` trim {file} to the first {b} seconds (KeepFirst); `v3_remove_first` remove the first {b} seconds of {file} (RemoveFirst) | keep or remove the first half |
-| `v3_amb_trim_last_half` | trim the last half of {file} | NoTime (50%) | KeepLast | flip (keep ↔ remove, same span) | `trim_t3` keep only {a} to {b} seconds of {file} (KeepRange); `cut_t2` remove {a} to {b} seconds from {file} (RemoveRange) | keep or remove the last half |
-| `v3_amb_cut_first` | cut the first {b} seconds of {file} | Secs | RemoveFirst | flip (keep ↔ remove, same span) | `cut_t1` cut the first {b} seconds off {file} (RemoveFirst); `v3_keep_first` keep only the first {b} seconds of {file} (KeepFirst) | without 'off' or 'down to', 'cut the first N seconds of X' is read both ways |
-| `v3_amb_quiet` | make {file} quiet | NoTime | Mute | unsupported: lower the volume | `train_mute_x2` make {file} silent (Mute) | v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do |
+| id | request | offered instead | cannot | why |
+|---|---|---|---|---|
+| `v3_amb_quiet` | make {file} quiet | mute {file} | lower the volume | v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do |
+| `v4_unsup_quieter` | make {file} quieter | mute {file} | lower the volume | a volume change, not silence |
+| `v4_unsup_lower_volume` | lower the volume of {file} | mute {file} | lower the volume | a volume change, not silence |
+| `v4_unsup_turn_down` | turn the sound down in {file} | mute {file} | lower the volume | 'down', not 'off': a volume change |
 
 ## Vocabulary offered in clarify questions
 
@@ -139,6 +135,10 @@ when both use seconds), so the model learns the decision from the wording.
 | `concat_t4` | combine {file} with itself into one file | word-for-word the held-out template concat_h3: training on it leaks held-out wording |
 | `train_extract_x4` | export the soundtrack as mp3 | names no file; the app binds files, but the request text alone cannot say which |
 | `speed_t3` | speed {file} up to {f}x | v1 used it for factors below 1 ('speed up to 0.8x'), which contradicts itself |
+| `v3_amb_trim_first_pct` | trim the first {pct} of {file} | phrasebook Q1: 'trim the first/last ...' names a part but is one structure away from 'trim X to the first N' (keep); not taught |
+| `v3_amb_trim_last_pct` | trim the last {pct} of {file} | as above |
+| `v3_amb_trim_first_half` | trim the first half of {file} | as above |
+| `v3_amb_trim_last_half` | trim the last half of {file} | as above |
 
 ## Clarify requests: arguments missing (missing list computed by the verified core)
 

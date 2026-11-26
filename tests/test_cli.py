@@ -155,3 +155,15 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHelp(unittest.TestCase):
+    def test_help_shows_the_phrasebook(self):
+        out = StringIO()
+        with redirect_stdout(out), self.assertRaises(SystemExit) as done:
+            cli.main(["--help"])
+        self.assertEqual(done.exception.code, 0)
+        text = out.getvalue()
+        self.assertIn("How to ask (the MiniCut phrasebook)", text)
+        self.assertIn("cut the first 10 seconds off clip.mp4", text)
+        self.assertIn('"cut ... of" and "cut ... off" mean the same', text)

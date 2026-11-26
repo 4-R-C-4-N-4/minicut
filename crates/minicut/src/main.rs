@@ -2,6 +2,7 @@ mod clarify;
 mod grammar;
 mod label;
 mod naming;
+mod phrasebook;
 mod prompts;
 mod render;
 mod rng;
@@ -10,7 +11,7 @@ mod wire;
 
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl | minicut meaning --call JSON --probe JSON | minicut system-prompt | minicut label --seed N --out ROWS --meta META [--oversample PCT]";
+const USAGE: &str = "usage: minicut --help | minicut phrasebook [--markdown | --check TEXT] | minicut grammar | minicut templates --markdown | minicut validate --call JSON --probe JSON | minicut validate --batch < rows.jsonl | minicut meaning --call JSON --probe JSON | minicut system-prompt | minicut label --seed N --out ROWS --meta META [--oversample PCT]";
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter()
@@ -22,6 +23,22 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(|s| s.as_str()) {
+        Some("-h" | "--help" | "help") => {
+            print!("{USAGE}\n\n{}", phrasebook::help_text());
+            ExitCode::SUCCESS
+        }
+        Some("phrasebook") => {
+            if let Some(text) = flag(&args, "--check") {
+                // how the phrasebook reads a keep/remove wording (the model,
+                // not this check, reads real requests)
+                println!("{:?}", phrasebook::reading(text));
+            } else if args.iter().any(|a| a == "--markdown") {
+                print!("{}", phrasebook::markdown());
+            } else {
+                print!("{}", phrasebook::help_text());
+            }
+            ExitCode::SUCCESS
+        }
         Some("label") => {
             let seed = flag(&args, "--seed").and_then(|s| s.parse::<u64>().ok());
             let (Some(seed), Some(out), Some(meta)) =

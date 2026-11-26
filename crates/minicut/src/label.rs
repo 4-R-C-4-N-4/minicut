@@ -3,9 +3,9 @@
 //! A row is made by sampling an *intent* (what the request means), choosing a
 //! reviewed template of that intent kind (templates.rs), rendering the user
 //! text, and taking the label ONLY from the verified core: `try_label`,
-//! `pct_of`, `scale_half`/`scale_quarter`, the speed functions, `flip` and
-//! `missing`. Ambiguous wording becomes a clarify that offers our own
-//! vocabulary (P3-D11). Eval-freeze policy is NOT applied here; the Python
+//! `pct_of`, `scale_half`/`scale_quarter`, the speed functions and
+//! `missing`. Keep vs remove follows the phrasebook; requests MiniCut cannot
+//! do become a clarify that offers a supported edit. Eval-freeze policy is NOT applied here; the Python
 //! gate (training/build_verified.py) drops, never edits (P3-D3).
 
 use crate::clarify::{self, Request, REQUESTS};
@@ -14,8 +14,7 @@ use crate::prompts::SYSTEM_PROMPT;
 use crate::render::{clock_text, pct_text, secs_text};
 use crate::rng::SplitMix64;
 use crate::templates::{
-    template, vocab, vocab_in, Ambiguous, Applies, IntentKind as K, Num, Other, Template,
-    AMBIGUOUS, TEMPLATES,
+    vocab, Applies, IntentKind as K, Num, Template, Unsupported, TEMPLATES, UNSUPPORTED,
 };
 use minicut_core::{self as mc, Clip, Edit, Intent, Kind};
 use std::collections::BTreeSet;
@@ -120,12 +119,12 @@ const AT_PCT: &[u64] = &[60, 70, 75, 80, 90];
 const TIME_PCT: &[u64] = &[10, 20, 25, 40, 50, 75];
 const CRF_DEFAULT: u8 = 23; // no template states a CRF, so the label uses the default
 
-/// Rows per tool; "clarify" is split into argument-missing and
-/// reading-ambiguous (plan open question 2: the pilot's mix and size).
+/// Rows per tool; "clarify" (310, the pilot's count) is split into
+/// argument-missing and unsupported-request rows.
 pub struct Counts {
     pub per_tool: Vec<(&'static str, usize)>,
     pub clarify_missing: usize,
-    pub clarify_reading: usize,
+    pub clarify_unsupported: usize,
 }
 
 impl Counts {
@@ -136,7 +135,7 @@ impl Counts {
         Counts {
             per_tool: self.per_tool.iter().map(|(t, n)| (*t, up(*n))).collect(),
             clarify_missing: up(self.clarify_missing),
-            clarify_reading: up(self.clarify_reading),
+            clarify_unsupported: up(self.clarify_unsupported),
         }
     }
 
@@ -152,8 +151,10 @@ impl Counts {
                 ("extract_audio", 244),
                 ("mute", 120),
             ],
-            clarify_missing: 250,
-            clarify_reading: 60,
+            // 4 unsupported wordings x ~30 filenames cannot fill 60 unique
+            // rows; the pilot's clarify total (310) is kept
+            clarify_missing: 280,
+            clarify_unsupported: 30,
         }
     }
 }
@@ -421,17 +422,6 @@ fn span(i: Intent, c: &Clip) -> (u64, u64) {
     }
 }
 
-fn intent_kind(i: Intent) -> K {
-    match i {
-        Intent::KeepRange { .. } => K::KeepRange,
-        Intent::RemoveRange { .. } => K::RemoveRange,
-        Intent::KeepFirst { .. } => K::KeepFirst,
-        Intent::RemoveFirst { .. } => K::RemoveFirst,
-        Intent::KeepLast { .. } => K::KeepLast,
-        Intent::RemoveLast { .. } => K::RemoveLast,
-    }
-}
-
 fn make_intent(k: K, a: u64, b: u64) -> Intent {
     match k {
         K::KeepRange => Intent::KeepRange {
@@ -509,21 +499,6 @@ fn meta(kind: &str, tool: &str, fixture: Option<&str>, tid: &str, intent: String
     ])
 }
 
-/// Mark a row as part of a near-miss group: the clarify_reading anchor
-/// (near_miss_of = None) or one of its partners. The gate keeps a partner only
-/// if its anchor is kept (training/build_verified.py).
-fn grouped(m: J, group: u64, of: Option<&str>) -> J {
-    let J::O(mut fields) = m else {
-        unreachable!("meta is an object")
-    };
-    fields.push(("group", J::I(group)));
-    fields.push((
-        "near_miss_of",
-        of.map_or(J::Null, |id| J::S(id.to_string())),
-    ));
-    J::O(fields)
-}
-
 fn templates_of(kinds: &[K]) -> Vec<&'static Template> {
     TEMPLATES
         .iter()
@@ -587,8 +562,6 @@ pub struct Generator {
     pub resampled: usize,
     /// (made, wanted) for every request that ran out of unique rows
     pub short: Vec<(usize, usize)>,
-    /// next near-miss group id (a clarify_reading row and its partners)
-    groups: u64,
 }
 
 impl Generator {
@@ -599,7 +572,6 @@ impl Generator {
             seen: BTreeSet::new(),
             resampled: 0,
             short: Vec::new(),
-            groups: 0,
         }
     }
 
@@ -630,71 +602,6 @@ impl Generator {
         } else {
             None
         }
-    }
-
-    /// Accept a unit (a clarify row and its near-miss partners) only if every
-    /// row in it is new, so a unit is never split by the dedupe.
-    fn accept_all(&mut self, rows: Vec<Row>) -> Option<Vec<Row>> {
-        let keys: Vec<(String, String)> = rows
-            .iter()
-            .map(|r| (r.prompt.clone(), r.assistant.clone()))
-            .collect();
-        let distinct: BTreeSet<&(String, String)> = keys.iter().collect();
-        if distinct.len() != keys.len() || keys.iter().any(|k| self.seen.contains(k)) {
-            return None;
-        }
-        self.seen.extend(keys);
-        Some(rows)
-    }
-
-    /// A near-miss partner of an ambiguous wording: an unambiguous template
-    /// on the same fixture and file. When the anchor said N seconds and the
-    /// partner is a first-N wording, it says the same N; otherwise its
-    /// numbers are sampled. The label comes from try_label like any tool row.
-    #[allow(clippy::too_many_arguments)]
-    fn near_row(
-        &mut self,
-        id: &str,
-        kind: K,
-        fx: &'static Fixture,
-        file: &str,
-        secs: Option<u64>,
-        group: u64,
-        of: &str,
-    ) -> Option<Row> {
-        let t = template(id, kind)?;
-        let c = fx.clip;
-        let (edit, fill, intent_text, start, end, tool) = if kind == K::Mute {
-            let v = Fill {
-                file: file.to_string(),
-                ..Default::default()
-            };
-            (Edit::Mute, v, "Mute".to_string(), 0, 0, "mute")
-        } else {
-            let i = match secs {
-                Some(ms) if t.num == Num::Secs && matches!(kind, K::KeepFirst | K::RemoveFirst) => {
-                    make_intent(kind, ms, ms)
-                }
-                _ => sample_time_intent(&mut self.rng, t, &c)?,
-            };
-            let e = mc::try_label(i, c)?;
-            let (s, en) = span(i, &c);
-            let tool = if matches!(kind, K::KeepRange | K::KeepFirst | K::KeepLast) {
-                "trim"
-            } else {
-                "cut_out"
-            };
-            (e, time_fill(i, file), format!("{i:?}"), s, en, tool)
-        };
-        if !applies(t.applies, start, end, &c, &fill) || !mc::validate(edit, c) {
-            return None;
-        }
-        let m = meta("tool", tool, Some(fx.name), t.id, intent_text, self.seed);
-        Some(Row {
-            prompt: render(t.text, t.num, &fill),
-            assistant: dumps(&edit_json(edit, file)),
-            meta: grouped(m, group, Some(of)),
-        })
     }
 
     /// One tool row, or None to resample (template did not apply, label
@@ -964,174 +871,82 @@ impl Generator {
         })
     }
 
-    /// A reading-ambiguous clarify row followed by its near-miss partners.
-    fn clarify_reading_row(&mut self) -> Option<Vec<Row>> {
-        let amb: &Ambiguous = self.rng.pick(AMBIGUOUS);
-        // a mute partner needs a clip with audio
-        let fx = self.fixture(amb.near.iter().any(|(_, k)| *k == K::Mute));
-        let c = fx.clip;
+    /// A request MiniCut cannot do ("make X quiet"): a clarify that says so
+    /// and offers the nearest supported edit (phrasebook rule 4). Every
+    /// argument of the offered edit is given, so `missing` is empty.
+    fn clarify_unsupported_row(&mut self) -> Option<Row> {
+        let u: &Unsupported = self.rng.pick(UNSUPPORTED);
+        let fx = self.fixture(false);
         let file = self.file();
-        // anchor_secs: the seconds the anchor stated, if it stated any
-        let (prompt, question, intent_text, anchor_secs) = match amb.other {
-            Other::Unsupported(what) => {
-                let supported = self.example(Kind::Mute, &file);
-                let prompt = render(
-                    amb.text,
-                    amb.num,
-                    &Fill {
-                        file: file.clone(),
-                        ..Default::default()
-                    },
-                );
-                (
-                    prompt,
-                    clarify::unsupported_question(&supported, what),
-                    format!("{:?}|unsupported", amb.reading),
-                    None,
-                )
-            }
-            Other::Flip => {
-                let (ms, fill) = match (amb.fixed_pct, amb.num) {
-                    (Some(p), _) => (
-                        mc::pct_of(c.duration_ms, p)?,
-                        Fill {
-                            file: file.clone(),
-                            ..Default::default()
-                        },
-                    ),
-                    (None, Num::Pct) => {
-                        let p = *self.rng.pick(TIME_PCT);
-                        (
-                            mc::pct_of(c.duration_ms, p)?,
-                            Fill {
-                                file: file.clone(),
-                                pct: Some(p),
-                                ..Default::default()
-                            },
-                        )
-                    }
-                    _ => {
-                        let ms = 500 * (4 + self.rng.below((c.duration_ms - 2500) / 500 - 3));
-                        (
-                            ms,
-                            Fill {
-                                file: file.clone(),
-                                b: Some(ms),
-                                a: Some(ms),
-                                ..Default::default()
-                            },
-                        )
-                    }
-                };
-                let first = make_intent(amb.reading, ms, ms);
-                let second = mc::flip(first);
-                // both readings must be real, accepted edits, or asking is pointless
-                mc::try_label(first, c)?;
-                mc::try_label(second, c)?;
-                // Suggest both readings in the user's own terms: a percentage
-                // ("trim the first 25%", "the first half") stays a percentage;
-                // seconds stay seconds. Never seconds derived from the hidden
-                // clip duration, which the model cannot see.
-                let pct = fill.pct.or(amb.fixed_pct);
-                let say = |i: Intent| match pct {
-                    Some(p) => {
-                        let t = vocab_in(intent_kind(i), Num::Pct).expect("percentage vocabulary");
-                        render(
-                            t.text,
-                            Num::Pct,
-                            &Fill {
-                                file: file.clone(),
-                                pct: Some(p),
-                                ..Default::default()
-                            },
-                        )
-                    }
-                    None => {
-                        let t = vocab_in(intent_kind(i), Num::Secs).expect("seconds vocabulary");
-                        render(t.text, Num::Secs, &time_fill(i, &file))
-                    }
-                };
-                let prompt = render(amb.text, amb.num, &fill);
-                (
-                    prompt,
-                    clarify::reading_question(&say(first), &say(second)),
-                    format!("{first:?}|{second:?}"),
-                    (amb.num == Num::Secs).then_some(ms),
-                )
-            }
+        let kind = match u.offer {
+            K::Mute => Kind::Mute,
+            other => unreachable!("offer {other:?} has no clarify example"),
         };
-        // reading-ambiguous: both readings are fully specified, so the proved
-        // missing list is empty
+        let offered = self.example(kind, &file);
+        let prompt = render(
+            u.text,
+            Num::NoTime,
+            &Fill {
+                file: file.clone(),
+                ..Default::default()
+            },
+        );
+        let question = clarify::unsupported_question(&offered, u.what);
         let assistant = dumps(&clarify_json(&question, &[]));
-        let group = self.groups;
         let m = meta(
-            "clarify_reading",
+            "clarify_unsupported",
             "clarify",
             Some(fx.name),
-            amb.id,
-            intent_text,
+            u.id,
+            format!("{:?}|unsupported", u.offer),
             self.seed,
         );
-        let mut unit = vec![Row {
+        self.accept(Row {
             prompt,
             assistant,
-            meta: grouped(m, group, None),
-        }];
-        for (id, kind) in amb.near {
-            // sampled partners may miss their template's applies-rule: retry
-            let row = (0..20)
-                .find_map(|_| self.near_row(id, *kind, fx, &file, anchor_secs, group, amb.id))?;
-            unit.push(row);
-        }
-        let unit = self.accept_all(unit)?;
-        self.groups += 1;
-        Some(unit)
+            meta: m,
+        })
     }
 
     /// Generate all rows in a fixed order, then shuffle with the same RNG.
-    /// A clarify_reading row and its near-miss partners form one unit: units
-    /// are shuffled, and a unit's rows stay adjacent.
     pub fn run(&mut self, counts: &Counts) -> Vec<Row> {
-        let mut units: Vec<Vec<Row>> = Vec::new();
-        let mut take =
-            |g: &mut Generator, n: usize, f: &dyn Fn(&mut Generator) -> Option<Vec<Row>>| {
-                let mut made = 0;
-                let mut tries = 0;
-                while made < n {
-                    tries += 1;
-                    if tries > 200 * n + 1000 {
-                        // the unique (prompt, label) space is exhausted; report it
-                        // and let the gate's target check decide
-                        g.short.push((made, n));
-                        break;
-                    }
-                    match f(g) {
-                        Some(u) => {
-                            units.push(u);
-                            made += 1;
-                        }
-                        None => g.resampled += 1,
-                    }
+        let mut rows = Vec::new();
+        let mut take = |g: &mut Generator, n: usize, f: &dyn Fn(&mut Generator) -> Option<Row>| {
+            let mut made = 0;
+            let mut tries = 0;
+            while made < n {
+                tries += 1;
+                if tries > 200 * n + 1000 {
+                    // the unique (prompt, label) space is exhausted; report it
+                    // and let the gate's target check decide
+                    g.short.push((made, n));
+                    break;
                 }
-            };
+                match f(g) {
+                    Some(r) => {
+                        rows.push(r);
+                        made += 1;
+                    }
+                    None => g.resampled += 1,
+                }
+            }
+        };
         for (tool, n) in &counts.per_tool {
             let tool: &'static str = tool;
-            take(self, *n, &move |g: &mut Generator| {
-                g.tool_row(tool).map(|r| vec![r])
-            });
+            take(self, *n, &move |g: &mut Generator| g.tool_row(tool));
         }
         take(self, counts.clarify_missing, &|g: &mut Generator| {
-            g.clarify_missing_row().map(|r| vec![r])
+            g.clarify_missing_row()
         });
-        take(self, counts.clarify_reading, &|g: &mut Generator| {
-            g.clarify_reading_row()
+        take(self, counts.clarify_unsupported, &|g: &mut Generator| {
+            g.clarify_unsupported_row()
         });
-        let mut order: Vec<usize> = (0..units.len()).collect();
+        let mut order: Vec<usize> = (0..rows.len()).collect();
         self.rng.shuffle(&mut order);
-        let mut slots: Vec<Option<Vec<Row>>> = units.into_iter().map(Some).collect();
+        let mut slots: Vec<Option<Row>> = rows.into_iter().map(Some).collect();
         order
             .into_iter()
-            .flat_map(|i| slots[i].take().unwrap())
+            .map(|i| slots[i].take().unwrap())
             .collect()
     }
 }
@@ -1161,9 +976,9 @@ mod tests {
             let s = render(t.text, t.num, &full);
             assert!(!s.contains('{') && !s.contains('}'), "{}: {s}", t.id);
         }
-        for a in AMBIGUOUS {
-            let s = render(a.text, a.num, &full);
-            assert!(!s.contains('{') && !s.contains('}'), "{}: {s}", a.id);
+        for u in UNSUPPORTED {
+            let s = render(u.text, Num::NoTime, &full);
+            assert!(!s.contains('{') && !s.contains('}'), "{}: {s}", u.id);
         }
     }
 
@@ -1199,7 +1014,7 @@ mod tests {
 
     #[test]
     fn fixtures_are_long_enough_for_the_sampler() {
-        // sample_time_intent and clarify_reading_row subtract up to 2500 ms
+        // sample_time_intent subtracts up to 2500 ms
         // and need room for a 2 s keep on a 0.5 s grid.
         for f in FIXTURES {
             assert!(
@@ -1232,7 +1047,7 @@ mod tests {
         let c = Counts {
             per_tool: vec![("trim", 40), ("cut_out", 40), ("scale", 20), ("speed", 20)],
             clarify_missing: 20,
-            clarify_reading: 10,
+            clarify_unsupported: 10,
         };
         let a: Vec<String> = Generator::new(7).run(&c).iter().map(|r| r.line()).collect();
         let b: Vec<String> = Generator::new(7).run(&c).iter().map(|r| r.line()).collect();
@@ -1245,14 +1060,7 @@ mod tests {
     fn every_tool_target_passes_the_wire_validator_and_keeps_grammar_order() {
         let mut g = Generator::new(1);
         let rows = g.run(&Counts::pilot_matched());
-        // 2,319 requested rows plus the near-miss partners of the 60 ambiguous
-        // rows; the gate counts partners against their tool's target
-        let partners = rows
-            .iter()
-            .filter(|r| dumps(&r.meta).contains("\"near_miss_of\": \"v3_amb"))
-            .count();
-        assert!((60..=120).contains(&partners), "{partners}");
-        assert_eq!(rows.len(), 2319 + partners);
+        assert_eq!(rows.len(), 2319);
         for r in &rows {
             let v: serde_json::Value = serde_json::from_str(&r.assistant).unwrap();
             let tool = v["tool"].as_str().unwrap();
@@ -1325,97 +1133,19 @@ mod tests {
     }
 
     #[test]
-    fn ambiguous_rows_offer_both_readings_and_missing_is_empty() {
+    fn unsupported_rows_offer_a_supported_edit_and_missing_is_empty() {
         let mut g = Generator::new(3);
+        let mut n = 0;
         for _ in 0..200 {
-            if let Some(unit) = g.clarify_reading_row() {
-                let r = &unit[0];
+            if let Some(r) = g.clarify_unsupported_row() {
                 let v: serde_json::Value = serde_json::from_str(&r.assistant).unwrap();
                 assert_eq!(v["missing"], serde_json::json!([]), "{}", r.assistant);
                 let q = v["question"].as_str().unwrap();
-                assert!(q.starts_with("Do you"), "{q}");
+                assert!(q.starts_with("Do you mean \"mute "), "{q}");
+                assert!(q.ends_with("I can't lower the volume."), "{q}");
+                n += 1;
             }
         }
-    }
-
-    #[test]
-    fn every_ambiguous_row_comes_with_its_near_miss_partners() {
-        let field = |r: &Row, k: &str| -> serde_json::Value {
-            serde_json::from_str::<serde_json::Value>(&dumps(&r.meta)).unwrap()[k].clone()
-        };
-        let mut g = Generator::new(11);
-        let mut per_anchor: std::collections::BTreeMap<String, usize> = Default::default();
-        for _ in 0..600 {
-            let Some(unit) = g.clarify_reading_row() else {
-                continue;
-            };
-            let anchor = &unit[0];
-            let id = field(anchor, "template_id").as_str().unwrap().to_string();
-            let amb = AMBIGUOUS.iter().find(|a| a.id == id).unwrap();
-            assert_eq!(unit.len(), 1 + amb.near.len(), "{id}");
-            assert_eq!(field(anchor, "near_miss_of"), serde_json::Value::Null);
-            let file = anchor
-                .prompt
-                .split_whitespace()
-                .find(|w| w.contains('.'))
-                .unwrap();
-            let tools: Vec<String> = unit[1..]
-                .iter()
-                .map(|p| {
-                    assert_eq!(field(p, "group"), field(anchor, "group"));
-                    assert_eq!(field(p, "near_miss_of").as_str(), Some(id.as_str()));
-                    assert_ne!(p.prompt, anchor.prompt);
-                    assert!(p.prompt.contains(file), "{} / {}", anchor.prompt, p.prompt);
-                    let v: serde_json::Value = serde_json::from_str(&p.assistant).unwrap();
-                    v["tool"].as_str().unwrap().to_string()
-                })
-                .collect();
-            if amb.other == Other::Flip {
-                // the model sees both readings stated plainly, next to the question
-                assert!(
-                    tools.contains(&"trim".into()) && tools.contains(&"cut_out".into()),
-                    "{tools:?}"
-                );
-            }
-            if amb.num == Num::Secs {
-                // "cut the first 7 seconds of X" pairs with "... 7 seconds off X"
-                let n = anchor
-                    .prompt
-                    .split_whitespace()
-                    .find(|w| w.starts_with(|c: char| c.is_ascii_digit()))
-                    .unwrap();
-                for p in &unit[1..] {
-                    assert!(
-                        p.prompt.split_whitespace().any(|w| w == n),
-                        "{} / {}",
-                        anchor.prompt,
-                        p.prompt
-                    );
-                }
-            }
-            *per_anchor.entry(id).or_default() += 1;
-        }
-        assert_eq!(per_anchor.len(), AMBIGUOUS.len(), "{per_anchor:?}");
-    }
-
-    #[test]
-    fn run_keeps_each_unit_adjacent() {
-        let rows = Generator::new(4).run(&Counts::pilot_matched());
-        let groups: Vec<Option<u64>> = rows
-            .iter()
-            .map(|r| {
-                serde_json::from_str::<serde_json::Value>(&dumps(&r.meta)).unwrap()["group"]
-                    .as_u64()
-            })
-            .collect();
-        let mut seen = BTreeSet::new();
-        let mut prev = None;
-        for g in groups.iter().flatten() {
-            if Some(*g) != prev {
-                assert!(seen.insert(*g), "group {g} is split");
-            }
-            prev = Some(*g);
-        }
-        assert_eq!(seen.len(), Counts::pilot_matched().clarify_reading);
+        assert!(n >= 20, "{n}");
     }
 }
