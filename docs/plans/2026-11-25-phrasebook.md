@@ -1,6 +1,6 @@
 # Plan: the MiniCut phrasebook (a user grammar for requests)
 
-Status: proposal, not yet implemented. Ivy's direction (2026-11-25): don't deliberately confuse the model; "cut the first N seconds of X" means the same as "… off X"; define a user grammar and show it in `minicut --help`.
+Status: implemented (branch `phrasebook`); GPU sweep pending. Q1 = (b), Q2 = not yet (Ivy: "do what you can", recommendations taken). Ivy's direction (2026-11-25): don't deliberately confuse the model; "cut the first N seconds of X" means the same as "… off X"; define a user grammar and show it in `minicut --help`.
 
 ## Why
 
@@ -62,3 +62,26 @@ Total about one working day. The verified core is unchanged: labels still come o
   - (b) leave it out of training entirely and list only canonical phrasings in the phrasebook.
   - Recommendation: (b). Teach only phrasings whose meaning is carried by a clear keyword.
 - **Q2. System prompt.** Should the system prompt carry a one-line version of the rule? That would change the prompt used in training and inference (parity tests cover both). Recommendation: not yet; measure the data change alone first.
+
+## Implemented
+
+- `crates/minicut/src/phrasebook.rs`: keyword table, `reading()` classifier, help text.
+  - `minicut --help` and `minicut phrasebook [--markdown | --check TEXT]` print it.
+  - `docs/phrasebook.md` and `minicut/phrasebook.txt` (the Python CLI's `--help` epilog, shipped as package data) are generated; a sync test keeps them current.
+- The tests prove:
+  - every time template follows the rule;
+  - every trim/cut missing-argument request has no times;
+  - the untaught "trim the first/last …" wordings classify as not covered;
+  - all 68 frozen eval keep/remove/clarify prompts classify as the eval expects. Removing `without` from the remove words fails that test, so it checks something.
+- Templates:
+  - "cut the first {b} seconds of {file}" is `v4_cut_first_of` (RemoveFirst);
+  - the four "trim the first/last …" rows moved to `EXCLUDED`;
+  - the flip ambiguity class and the near-miss pairing are removed;
+  - `UNSUPPORTED` (rule 4) holds four volume requests, each offering "mute X".
+- Clarify mix: 280 missing-argument + 30 unsupported = 310, as in the pilot. Four unsupported wordings × ~30 filenames cannot fill 60 unique rows.
+- `train_verified_v4`:
+  - 2,319 rows, pilot-matched;
+  - all five acceptance checks PASS;
+  - the phrasebook agrees with every one of its 674 trim/cut_out labels;
+  - 0 prompts with two targets.
+- Not changed: the verified core. `flip`/`readings_disagree` stay proved but unused by the generator.

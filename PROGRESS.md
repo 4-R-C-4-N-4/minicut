@@ -19,7 +19,16 @@
   - verified data: 0 inversions (0/4) and 190–191, except one collapse at v2 seed 1 (175, 18 unnecessary "keep or remove?" clarifies on plain keep/remove requests).
   - No reliable score difference.
 - **Near-miss pairs (`train_verified_v3`):** each ambiguous clarify row ships with unambiguous partners (same file, same seconds), and the gate keeps partners only with their anchor. Seeds 1–3 gave 182 / 191 / 180, which **did not stabilise** (v2: 175 / 190 / 190). Every weak verified run flips the dev prompt "cut the first 10 seconds off clip.mp4" (4 dev cases) into a clarify. Verified data still has 0 new inversions in 7/7 runs.
-- **Next (decision):** drop the `v3_amb_cut_first` ("… of X") ambiguity, and/or ablate reading-ambiguous rows entirely, then re-sweep.
+- **Phrasebook (Ivy, 2026-11-25: "don't deliberately confuse the model"; plan `docs/plans/2026-11-25-phrasebook.md`):**
+  - Keep vs remove has one rule: wording that names the result keeps it, wording that names a part removes it.
+  - "cut the first N seconds of X" is a cut. No keep/remove ambiguity rows remain.
+  - `minicut --help` prints the phrasebook.
+  - `train_verified_v4`: all acceptance checks PASS, and the phrasebook agrees with all 674 trim/cut labels.
+- **Phrasebook sweep (v4, seeds 1–3): 180 / 186 / 186, mean 184.0** (v1 data 189.3, v2 185.0, v3 184.3).
+  - It did not help, and inversions returned at 2 of 3 seeds.
+  - The new unsupported rows (all offering "mute X") spread to real mute requests.
+  - Across versions, only verified data over-clarifies (v1: 0/0/0). Its clarify targets are twice as long and always quote a full tool request ("For example: …"); that is the leading hypothesis.
+- **Next (decision):** v5 = short v1-style clarify questions plus only the v1 "make X quiet" row, then sweep.
 
 ## Rust port, Phase 3: plan notes
 

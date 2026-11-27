@@ -23,4 +23,4 @@ minicut = "minicut.cli:main"
 include = ["minicut*", "factory*"]
 
 [tool.setuptools.package-data]
-minicut = ["grammar/*.gbnf"]
+minicut = ["grammar/*.gbnf", "phrasebook.txt"]

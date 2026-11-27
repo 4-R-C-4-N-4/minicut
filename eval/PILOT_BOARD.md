@@ -104,3 +104,29 @@ At v3 seed 3 the reflex also spread to other tools: "remove the audio from clip.
 - An ablation without reading-ambiguous rows: verified tool labels plus missing-argument clarifies only. It would show whether the inversion fix survives without the over-clarify risk.
 
 Local evidence: `training/output/sweep-verified_v3-s{1,2,3}/`.
+
+## Phrasebook (`train_verified_v4`, seeds 1–3)
+
+`train_verified_v4` applies the phrasebook: one keep/remove rule, no keep-or-remove clarify rows, and 30 unsupported-request rows ("make X quiet" and three volume wordings, each offering "mute X"). All runs were graded by today's grader, and every board was re-verified on CPU.
+
+| Data | Seed 1 | Seed 2 | Seed 3 | Mean | New inversions (seeds) | Unnecessary clarifies (s1/s2/s3) |
+|---|---:|---:|---:|---:|---|---|
+| pilot v1 | 191 | 188 | 189 | 189.3 | 3 of 3 | 0 / 0 / 0 |
+| verified v2 | 175 | 190 | 190 | 185.0 | 0 of 3 | 18 / 1 / 2 |
+| verified v3 (near-miss) | 182 | 191 | 180 | 184.3 | 0 of 3 | 7 / 1 / 13 |
+| verified v4 (phrasebook) | 180 | 186 | 186 | 184.0 | 2 of 3 | 8 / 1 / 7 |
+
+**Reading.**
+- The phrasebook did not raise the score, and v4 lost the zero-inversion record. At seed 1, "clip.mp4 without the part from 5 to 10 seconds" became trim. At seed 3, "take the 0 to 5 second bit out of clip.mp4" became trim.
+- A new failure that I introduced: the unsupported-request rows all answer 'Do you mean "mute X"?', and that answer spread to real mute requests.
+  - "remove the audio from clip.mp4" and "make a silent version of clip.mp4" became 'Do you mean "mute clip.mp4"? I can't …' (7 cases at seed 3).
+  - "turn the sound **down** in X" (unsupported) also sits next to the mute template "turn **off** the sound in X", another near-pair.
+- **Cross-version pattern:** v1 data never over-clarifies (0/0/0), and every verified dataset does.
+  - The consistent difference is the clarify targets. v1 questions are short (median 42 characters, "What audio format should I extract to?").
+  - Ours are twice as long (median 94–95) and always end with 'For example: "<a full tool request>"'.
+  - The model is trained to emit real request phrasings inside clarify answers, with twice as many supervised clarify tokens.
+  - Hypothesis, untested: this is what tips plain requests into clarifies.
+
+**Next (decision needed; the example suggestions implement the "suggest MiniCut's own phrasings" rule):** v5 = v4 with short v1-style questions (the phrasebook is now in `--help`, so it doesn't need to be in every answer) and only the v1 "make X quiet" unsupported row. If that removes the over-clarify, the suggestion text was the cause.
+
+Local evidence: `training/output/sweep-verified_v4-s{1,2,3}/`.

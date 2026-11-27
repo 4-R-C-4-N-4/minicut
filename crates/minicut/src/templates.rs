@@ -7,9 +7,10 @@
 //! reason. Labels never come from this file. They come from the verified
 //! core (`try_label` and friends), keyed by `kind`.
 //!
-//! Ambiguous wording never produces a tool label (P3-D11). It lives in
-//! `AMBIGUOUS` and becomes a clarify that offers our own canonical
-//! phrasings, from `VOCAB`.
+//! Keep vs remove follows the phrasebook (crate::phrasebook): wording that
+//! names the result keeps it, wording that names a part removes it, so no
+//! keep/remove wording is ambiguous. Requests MiniCut cannot do live in
+//! `UNSUPPORTED` and become a clarify offering a supported edit from `VOCAB`.
 //!
 //! Placeholders: {file} {a} {b} (times), {pct}, {w} {h}, {f} (speed factor),
 //! {p} (speed percent), {codec} {container} {fmt}, {n} ("two"/"three"),
@@ -105,14 +106,6 @@ impl Template {
                     | IntentKind::ScaleQuarter
             )
     }
-}
-
-/// Vocabulary phrasing of `kind` in a given number style, for suggestions that
-/// must repeat the user's own terms (a percentage stays a percentage).
-pub fn vocab_in(kind: IntentKind, num: Num) -> Option<&'static Template> {
-    TEMPLATES
-        .iter()
-        .find(|t| t.kind == kind && t.num == num && t.applies == Applies::Always)
 }
 
 const fn t(
@@ -324,6 +317,14 @@ pub const TEMPLATES: &[Template] = &[
         "remove the first {b} seconds of {file}",
         A::Always,
         "'remove' names what goes",
+    ),
+    t(
+        "v4_cut_first_of",
+        K::RemoveFirst,
+        N::Secs,
+        "cut the first {b} seconds of {file}",
+        A::Always,
+        "phrasebook rule 2: a part named after 'cut' is removed; 'of' and 'off' mean the same",
     ),
     t(
         "v3_remove_first_pct",
@@ -878,104 +879,58 @@ pub const EXCLUDED: &[(&str, &str, &str)] = &[
         "speed {file} up to {f}x",
         "v1 used it for factors below 1 ('speed up to 0.8x'), which contradicts itself",
     ),
+    (
+        "v3_amb_trim_first_pct",
+        "trim the first {pct} of {file}",
+        "phrasebook Q1: 'trim the first/last ...' names a part but is one structure away from 'trim X to the first N' (keep); not taught",
+    ),
+    ("v3_amb_trim_last_pct", "trim the last {pct} of {file}", "as above"),
+    ("v3_amb_trim_first_half", "trim the first half of {file}", "as above"),
+    ("v3_amb_trim_last_half", "trim the last half of {file}", "as above"),
 ];
 
-/// How the second reading of ambiguous wording is chosen.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Other {
-    /// The keep/remove reading of the same span: `minicut_core::flip`. The
-    /// core proves the two readings disagree at every instant.
-    Flip,
-    /// The other reading is something MiniCut cannot do; only `reading`
-    /// is offered, and the question says what is not supported.
-    Unsupported(&'static str),
-}
-
-pub struct Ambiguous {
+/// Requests MiniCut cannot do (phrasebook rule 4): always a clarify that
+/// says what is not supported and offers the nearest edit it can do. There
+/// is no keep-vs-remove ambiguity class: the phrasebook gives every keep or
+/// remove wording one meaning (docs/plans/2026-11-25-phrasebook.md).
+pub struct Unsupported {
     pub id: &'static str,
     pub text: &'static str,
-    pub num: Num,
-    /// The first reading.
-    pub reading: IntentKind,
-    /// A percentage the wording implies without saying it ("half" = 50).
-    pub fixed_pct: Option<u64>,
-    pub other: Other,
+    /// The supported edit offered instead.
+    pub offer: IntentKind,
+    /// What MiniCut cannot do, as said in the question ("lower the volume").
+    pub what: &'static str,
     pub note: &'static str,
-    /// Near-miss partners (template id, kind): unambiguous wordings one step
-    /// away, emitted next to every clarify row of this wording with the same
-    /// file (and the same seconds when both use seconds), so the decision is
-    /// learned from the wording and not from the topic. Percentage and last-N
-    /// partners would need the clip's duration (P3-D12), so those anchors pair
-    /// with seconds or range wordings instead.
-    pub near: &'static [(&'static str, IntentKind)],
 }
 
-pub const AMBIGUOUS: &[Ambiguous] = &[
-    Ambiguous {
-        id: "v3_amb_trim_first_pct",
-        text: "trim the first {pct} of {file}",
-        num: N::Pct,
-        reading: K::KeepFirst,
-        fixed_pct: None,
-        other: Other::Flip,
-        note: "v1 labelled this keep-first; 'trim the first 25%' is read both ways",
-        near: &[
-            ("trim_t5", K::KeepFirst),
-            ("v3_remove_first", K::RemoveFirst),
-        ],
-    },
-    Ambiguous {
-        id: "v3_amb_trim_last_pct",
-        text: "trim the last {pct} of {file}",
-        num: N::Pct,
-        reading: K::KeepLast,
-        fixed_pct: None,
-        other: Other::Flip,
-        note: "same as above, at the end",
-        near: &[("trim_t3", K::KeepRange), ("cut_t2", K::RemoveRange)],
-    },
-    Ambiguous {
-        id: "v3_amb_trim_first_half",
-        text: "trim the first half of {file}",
-        num: N::NoTime,
-        reading: K::KeepFirst,
-        fixed_pct: Some(50),
-        other: Other::Flip,
-        note: "keep or remove the first half",
-        near: &[
-            ("trim_t5", K::KeepFirst),
-            ("v3_remove_first", K::RemoveFirst),
-        ],
-    },
-    Ambiguous {
-        id: "v3_amb_trim_last_half",
-        text: "trim the last half of {file}",
-        num: N::NoTime,
-        reading: K::KeepLast,
-        fixed_pct: Some(50),
-        other: Other::Flip,
-        note: "keep or remove the last half",
-        near: &[("trim_t3", K::KeepRange), ("cut_t2", K::RemoveRange)],
-    },
-    Ambiguous {
-        id: "v3_amb_cut_first",
-        text: "cut the first {b} seconds of {file}",
-        num: N::Secs,
-        reading: K::RemoveFirst,
-        fixed_pct: None,
-        other: Other::Flip,
-        note: "without 'off' or 'down to', 'cut the first N seconds of X' is read both ways",
-        near: &[("cut_t1", K::RemoveFirst), ("v3_keep_first", K::KeepFirst)],
-    },
-    Ambiguous {
+pub const UNSUPPORTED: &[Unsupported] = &[
+    Unsupported {
         id: "v3_amb_quiet",
         text: "make {file} quiet",
-        num: N::NoTime,
-        reading: K::Mute,
-        fixed_pct: None,
-        other: Other::Unsupported("lower the volume"),
+        offer: K::Mute,
+        what: "lower the volume",
         note: "v1 train_mute_x6; 'quiet' may mean quieter, which MiniCut cannot do",
-        near: &[("train_mute_x2", K::Mute)],
+    },
+    Unsupported {
+        id: "v4_unsup_quieter",
+        text: "make {file} quieter",
+        offer: K::Mute,
+        what: "lower the volume",
+        note: "a volume change, not silence",
+    },
+    Unsupported {
+        id: "v4_unsup_lower_volume",
+        text: "lower the volume of {file}",
+        offer: K::Mute,
+        what: "lower the volume",
+        note: "a volume change, not silence",
+    },
+    Unsupported {
+        id: "v4_unsup_turn_down",
+        text: "turn the sound down in {file}",
+        offer: K::Mute,
+        what: "lower the volume",
+        note: "'down', not 'off': a volume change",
     },
 ];
 
@@ -999,12 +954,6 @@ pub const VOCAB: &[(IntentKind, &str)] = &[
 
 /// The vocabulary template for a kind (with the given number style, when the
 /// kind has several canonical styles).
-/// The template row with this id and kind (ids such as trim_t5 have one
-/// row per v1 branch).
-pub fn template(id: &str, kind: IntentKind) -> Option<&'static Template> {
-    TEMPLATES.iter().find(|t| t.id == id && t.kind == kind)
-}
-
 pub fn vocab(kind: IntentKind) -> Option<&'static Template> {
     let id = VOCAB.iter().find(|(k, _)| *k == kind)?.1;
     TEMPLATES
@@ -1033,36 +982,13 @@ pub fn markdown() -> String {
             t.note
         );
     }
-    s += "\n## Ambiguous wording: always a clarify, never a label (P3-D11)\n\n\
-          Each clarify row is emitted next to its near-miss partners (same file, and the same seconds\n\
-          when both use seconds), so the model learns the decision from the wording.\n\n\
-          | id | wording | numbers | first reading | other reading | near-miss partners | why |\n|---|---|---|---|---|---|---|\n";
-    for a in AMBIGUOUS {
-        let other = match a.other {
-            Other::Flip => "flip (keep ↔ remove, same span)".to_string(),
-            Other::Unsupported(what) => format!("unsupported: {what}"),
-        };
-        let numbers = match a.fixed_pct {
-            Some(p) => format!("{:?} ({p}%)", a.num),
-            None => format!("{:?}", a.num),
-        };
-        let near: Vec<String> = a
-            .near
-            .iter()
-            .map(|(id, k)| {
-                let text = template(id, *k).map_or("(missing)", |t| t.text);
-                format!("`{id}` {text} ({k:?})")
-            })
-            .collect();
+    s += "\n## Unsupported requests: always a clarify offering a supported edit (phrasebook rule 4)\n\n\
+          | id | request | offered instead | cannot | why |\n|---|---|---|---|---|\n";
+    for u in UNSUPPORTED {
+        let offer = vocab(u.offer).map_or("(missing)", |t| t.text);
         s += &format!(
-            "| `{}` | {} | {} | {:?} | {} | {} | {} |\n",
-            a.id,
-            a.text,
-            numbers,
-            a.reading,
-            other,
-            near.join("; "),
-            a.note
+            "| `{}` | {} | {} | {} | {} |\n",
+            u.id, u.text, offer, u.what, u.note
         );
     }
     s += "\n## Vocabulary offered in clarify questions\n\n| kind | template | wording |\n|---|---|---|\n";
@@ -1081,34 +1007,6 @@ pub fn markdown() -> String {
 mod tests {
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
-
-    #[test]
-    fn near_miss_partners_are_text_labelable_and_cover_both_readings() {
-        let keep = [K::KeepRange, K::KeepFirst, K::KeepLast];
-        for a in AMBIGUOUS {
-            assert!(!a.near.is_empty(), "{} has no near-miss partners", a.id);
-            for (id, k) in a.near {
-                let t =
-                    template(id, *k).unwrap_or_else(|| panic!("{}: no template {id} {k:?}", a.id));
-                assert!(!t.needs_probe(), "{}: partner {id} needs the probe", a.id);
-                assert!(!HELDOUT.contains(id), "{}: partner {id} is held out", a.id);
-                assert_ne!(t.text, a.text);
-            }
-            if a.other == Other::Flip {
-                // one partner per reading: the model sees "act" for both
-                assert!(
-                    a.near.iter().any(|(_, k)| keep.contains(k)),
-                    "{}: no keep partner",
-                    a.id
-                );
-                assert!(
-                    a.near.iter().any(|(_, k)| !keep.contains(k)),
-                    "{}: no remove partner",
-                    a.id
-                );
-            }
-        }
-    }
 
     const HELDOUT: &[&str] = &[
         "clarify_h1",
@@ -1145,8 +1043,8 @@ mod tests {
         for t in TEMPLATES {
             assert!(!HELDOUT.contains(&t.id), "{}", t.id);
         }
-        for a in AMBIGUOUS {
-            assert!(!HELDOUT.contains(&a.id), "{}", a.id);
+        for u in UNSUPPORTED {
+            assert!(!HELDOUT.contains(&u.id), "{}", u.id);
         }
     }
 
@@ -1156,7 +1054,7 @@ mod tests {
             let v = vocab(*k).unwrap_or_else(|| panic!("no vocab template for {k:?} ({id})"));
             assert_eq!(v.kind, *k);
         }
-        // every time intent has a vocabulary phrasing, so every flip has a suggestion
+        // every time intent has a vocabulary phrasing (clarify suggestions)
         for k in [
             K::KeepRange,
             K::RemoveRange,
@@ -1170,61 +1068,21 @@ mod tests {
     }
 
     #[test]
-    fn ambiguous_wording_never_appears_as_a_template() {
+    fn unsupported_and_excluded_wording_never_appears_as_a_template() {
         let texts: BTreeSet<&str> = TEMPLATES.iter().map(|t| t.text).collect();
-        for a in AMBIGUOUS {
+        for u in UNSUPPORTED {
             assert!(
-                !texts.contains(a.text),
-                "ambiguous wording is also a template: {}",
-                a.text
+                !texts.contains(u.text),
+                "unsupported wording is also a template: {}",
+                u.text
             );
+            assert!(vocab(u.offer).is_some(), "{}: nothing to offer", u.id);
         }
         for (_, text, _) in EXCLUDED {
             assert!(
                 !texts.contains(text),
                 "excluded wording is still a template: {text}"
             );
-        }
-    }
-
-    #[test]
-    fn halves_carry_their_percentage() {
-        for a in AMBIGUOUS {
-            assert_eq!(a.text.contains("half"), a.fixed_pct == Some(50), "{}", a.id);
-            if a.num == Num::NoTime && a.other == Other::Flip {
-                assert!(a.fixed_pct.is_some(), "{}: a flip needs a span", a.id);
-            }
-        }
-    }
-
-    #[test]
-    fn percentage_readings_can_be_suggested_as_percentages() {
-        for k in [K::KeepFirst, K::RemoveFirst, K::KeepLast, K::RemoveLast] {
-            assert!(
-                vocab_in(k, Num::Pct).is_some(),
-                "{k:?} has no percentage phrasing"
-            );
-            assert!(
-                vocab_in(k, Num::Secs).is_some(),
-                "{k:?} has no seconds phrasing"
-            );
-        }
-    }
-
-    #[test]
-    fn flip_readings_are_time_intents() {
-        let time = [
-            K::KeepRange,
-            K::RemoveRange,
-            K::KeepFirst,
-            K::RemoveFirst,
-            K::KeepLast,
-            K::RemoveLast,
-        ];
-        for a in AMBIGUOUS {
-            if a.other == Other::Flip {
-                assert!(time.contains(&a.reading), "{}", a.id);
-            }
         }
     }
 
@@ -1328,7 +1186,11 @@ mod tests {
         let golden: BTreeMap<String, Vec<String>> =
             serde_json::from_str(include_str!("../tests/golden/v1_templates.json")).unwrap();
         let mut checked = 0;
-        for t in TEMPLATES.iter().filter(|t| !t.id.starts_with("v3_")) {
+        // v3_/v4_ ids are new wording (phase 3, phrasebook), not v1 ids
+        for t in TEMPLATES
+            .iter()
+            .filter(|t| !t.id.starts_with("v3_") && !t.id.starts_with("v4_"))
+        {
             let v1 = golden
                 .get(t.id)
                 .unwrap_or_else(|| panic!("{} is not a v1 train id", t.id));
